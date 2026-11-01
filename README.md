@@ -16,14 +16,23 @@ steps are recorded and survive restarts.
 
 | Workflow | Started by | What it does |
 | --- | --- | --- |
-| `Chat` | Each Telegram message or button tap | Loads the user, their people, reminders and recent history; runs the agent with its tools; saves the new messages; replies. |
+| `Conversation` | The first mail in an empty mailbox | Answers the user's mailbox in order, one turn at a time: messages sent in a row as one turn, button taps, and check-in and reminder nudges. Each turn loads the user, their people, reminders, summary and recent history, runs the agent, saves the new messages, replies, then folds old history into the summary. Ends after 10 idle minutes or 10 turns. |
 | `CheckIns` | A user's first message, then itself every day | Picks a few random times in the user's waking hours, sleeps until each, and has the agent text first: overdue contacts, upcoming birthdays, a cute text idea, a date idea. Then it sleeps until the day ends and starts the next day's run. |
-| `Reminder` | The agent's `scheduleReminder` tool, as a child run | Sleeps until the reminder is due (in steps of at most 6 days), has the agent deliver it, and repeats every `everyDays` days until cancelled. |
+| `Reminder` | The agent's `scheduleReminder` tool, as a child run | Sleeps until the reminder is due (in steps of at most 6 days), delivers it to the mailbox, and repeats every `everyDays` days until cancelled. Reminders are at most a year ahead, repeat at most daily, and a user can have 20. |
 
 The agent's tools: `rememberPerson`, `forgetPerson` (asks for confirmation
 with Yes/No buttons through `workflowai` tool approvals), `logContact`,
 `draftText` (sends a draft with WhatsApp/Telegram buttons), `scheduleReminder`,
 `cancelReminder` (cancels the reminder's run), and `updateSettings`.
+
+Every message, button tap, check-in and reminder is mail: it is pushed to
+the user's mailbox in Redis, then wakes their `Conversation` run through a
+hook, or starts one when none is listening. So a message that arrives while
+the agent is replying or summarizing waits its turn and is answered with
+that context, and mail that arrives as a run ends is picked up by the next.
+
+No wait in any workflow is longer than six days, under the seven days Vercel
+Queues delays, so QStash is never needed and its free plan is never touched.
 
 There is no cron job. Each user has one chain of `CheckIns` runs, and every
 run starts the next before it finishes, so each run's event log stays one day

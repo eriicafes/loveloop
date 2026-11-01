@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/eriicafes/go-workflow"
-	"github.com/eriicafes/go-workflow/workflowai"
 
 	"github.com/eriicafes/loveloop/store"
 	"github.com/eriicafes/loveloop/workflows"
@@ -44,7 +43,8 @@ func (f *Flows) CheckIns(ctx context.Context, input workflows.CheckIns) (workflo
 		if reason == "" {
 			continue
 		}
-		if err := f.nudge(ctx, input.ChatID, reason); err != nil {
+		mail := scoped[store.Mail]{ChatID: input.ChatID, Input: store.Mail{Nudge: reason}}
+		if _, err := workflow.Step(ctx, f.deliverMail, mail); err != nil {
 			return result, err
 		}
 		result.Sent++
@@ -65,20 +65,6 @@ func (f *Flows) CheckIns(ctx context.Context, input workflows.CheckIns) (workflo
 // saveCheckInsRun records the run that now carries the user's check-ins.
 func (f *Flows) saveCheckInsRun(ctx context.Context, input scoped[string]) (struct{}, error) {
 	return struct{}{}, f.Store.SetCheckInsRun(ctx, input.ChatID, input.Input)
-}
-
-// nudge has the agent text the user first for reason. The reason goes into
-// the conversation as a scheduler message, so the agent knows why it texted
-// when the user replies.
-func (f *Flows) nudge(ctx context.Context, chatID int64, reason string) error {
-	st, err := workflow.Step(ctx, f.loadState, chatID)
-	if err != nil {
-		return err
-	}
-	history := dropPendingApprovals(st.History)
-	turn := []workflowai.ModelMessage{userMessage("[LoveLoop scheduler, not typed by the user] " + reason)}
-	_, err = f.respond(ctx, st, history, turn, false, []string{"draftText"})
-	return err
 }
 
 func (f *Flows) loadUser(ctx context.Context, chatID int64) (store.User, error) {

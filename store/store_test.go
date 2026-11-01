@@ -84,3 +84,31 @@ func TestCompactHistory(t *testing.T) {
 		t.Fatalf("summary after reset: %+v, %v", summary, err)
 	}
 }
+
+func TestMailbox(t *testing.T) {
+	s := testStore(t)
+	ctx := t.Context()
+	for _, mail := range []Mail{{Text: "one"}, {Text: "two"}, {ApprovalKey: "k", Approved: true}} {
+		if err := s.PushMail(ctx, 1, mail); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mails, err := s.PeekMail(ctx, 1)
+	if err != nil || len(mails) != 3 || mails[0].Text != "one" || !mails[2].Approved {
+		t.Fatalf("peek: %+v, %v", mails, err)
+	}
+
+	// Mail delivered while a batch is handled stays after it is acked.
+	if err := s.PushMail(ctx, 1, Mail{Text: "late"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AckMail(ctx, 1, len(mails)); err != nil {
+		t.Fatal(err)
+	}
+	if count, err := s.MailCount(ctx, 1); err != nil || count != 1 {
+		t.Fatalf("count after ack: %d, %v", count, err)
+	}
+	if mails, err := s.PeekMail(ctx, 1); err != nil || len(mails) != 1 || mails[0].Text != "late" {
+		t.Fatalf("peek after ack: %+v, %v", mails, err)
+	}
+}

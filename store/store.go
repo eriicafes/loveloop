@@ -404,6 +404,57 @@ func (s *Store) CompactHistory(ctx context.Context, chatID int64, n int, first w
 	return compacted, err
 }
 
+// Mail is one item waiting in a user's mailbox for their conversation run:
+// a message they sent, their answer to an approval question, or a reason
+// for LoveLoop to text first.
+type Mail struct {
+	Text string `json:"text,omitempty"`
+	// ApprovalKey and Approved answer a pending tool approval.
+	ApprovalKey string `json:"approvalKey,omitempty"`
+	Approved    bool   `json:"approved,omitempty"`
+	// Nudge is why LoveLoop texts first, from a check-in or a reminder.
+	Nudge string `json:"nudge,omitempty"`
+}
+
+// MailBatch is the most mail PeekMail returns at once.
+const MailBatch = 20
+
+// PushMail adds mail to the end of the user's mailbox.
+func (s *Store) PushMail(ctx context.Context, chatID int64, mail Mail) error {
+	data, err := json.Marshal(mail)
+	if err != nil {
+		return err
+	}
+	return s.rdb.RPush(ctx, s.key("mailbox", chatID), data).Err()
+}
+
+// PeekMail returns up to MailBatch of the oldest mail in the user's mailbox
+// without removing it. AckMail removes it once it is handled.
+func (s *Store) PeekMail(ctx context.Context, chatID int64) ([]Mail, error) {
+	values, err := s.rdb.LRange(ctx, s.key("mailbox", chatID), 0, MailBatch-1).Result()
+	if err != nil {
+		return nil, err
+	}
+	mails := make([]Mail, len(values))
+	for i, value := range values {
+		if err := json.Unmarshal([]byte(value), &mails[i]); err != nil {
+			return nil, err
+		}
+	}
+	return mails, nil
+}
+
+// AckMail removes the n oldest mail from the user's mailbox. Mail is only
+// added at the end, so these are the ones PeekMail returned.
+func (s *Store) AckMail(ctx context.Context, chatID int64, n int) error {
+	return s.rdb.LTrim(ctx, s.key("mailbox", chatID), int64(n), -1).Err()
+}
+
+// MailCount returns how much mail waits in the user's mailbox.
+func (s *Store) MailCount(ctx context.Context, chatID int64) (int64, error) {
+	return s.rdb.LLen(ctx, s.key("mailbox", chatID)).Result()
+}
+
 // Once reports whether key is claimed for the first time within ttl. It
 // deduplicates Telegram updates and scheduled runs.
 func (s *Store) Once(ctx context.Context, key string, ttl time.Duration) (bool, error) {

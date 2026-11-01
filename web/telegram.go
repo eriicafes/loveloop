@@ -17,6 +17,7 @@ import (
 	"github.com/eriicafes/httpx"
 	"github.com/eriicafes/httpx/httperrors"
 
+	"github.com/eriicafes/loveloop/store"
 	"github.com/eriicafes/loveloop/telegram"
 	"github.com/eriicafes/loveloop/workflows"
 )
@@ -27,7 +28,7 @@ const WebhookPath = "/telegram"
 var errNoStore = errors.New("REDIS_URL is not set")
 
 // telegram serves POST /telegram, Telegram's webhook. It answers as soon as
-// it has started the run that handles the update, since Telegram retries
+// it has delivered the update to the user's mailbox, since Telegram retries
 // slow webhooks. A failed update answers 500, so Telegram redelivers it, and
 // redeliveries of handled updates are deduplicated.
 func (a *App) telegram(w http.ResponseWriter, r *http.Request) error {
@@ -45,7 +46,8 @@ func (a *App) telegram(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-// HandleUpdate starts the run that answers a Telegram update.
+// HandleUpdate delivers a Telegram update to the user's Conversation run,
+// which answers their mailbox in order.
 func (a *App) HandleUpdate(ctx context.Context, update telegram.Update) error {
 	if a.Store == nil {
 		return errNoStore
@@ -105,8 +107,7 @@ func (a *App) handleMessage(ctx context.Context, message telegram.Message) error
 	}
 
 	_ = a.Bot.SendChatAction(ctx, chatID, "typing")
-	_, err := workflow.Start(ctx, workflows.Chat{ChatID: chatID, Text: text})
-	return err
+	return workflows.Deliver(ctx, a.Store, chatID, store.Mail{Text: text})
 }
 
 // handleCallback handles a tap on an approval button, whose data is
@@ -120,9 +121,5 @@ func (a *App) handleCallback(ctx context.Context, query telegram.CallbackQuery) 
 	_ = a.Bot.AnswerCallbackQuery(ctx, query.ID, map[bool]string{true: "Okay 💔", false: "Kept safe 💞"}[approved])
 	_ = a.Bot.RemoveKeyboard(ctx, query.Message.Chat.ID, query.Message.MessageID)
 	_ = a.Bot.SendChatAction(ctx, query.Message.Chat.ID, "typing")
-	_, err := workflow.Start(ctx, workflows.Chat{
-		ChatID:   query.Message.Chat.ID,
-		Approval: &workflows.ApprovalAnswer{Key: parts[2], Approved: approved},
-	})
-	return err
+	return workflows.Deliver(ctx, a.Store, query.Message.Chat.ID, store.Mail{ApprovalKey: parts[2], Approved: approved})
 }

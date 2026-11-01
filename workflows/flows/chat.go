@@ -8,39 +8,42 @@ import (
 
 	"github.com/eriicafes/go-workflow"
 	"github.com/eriicafes/go-workflow/workflowai"
-
-	"github.com/eriicafes/loveloop/workflows"
 )
 
-// Chat answers one message from the user, or their answer to an approval
-// question. The conversation is kept in the store, so each turn starts from
-// what the agent said and did before.
-func (f *Flows) Chat(ctx context.Context, input workflows.Chat) (workflows.ChatResult, error) {
-	st, err := workflow.Step(ctx, f.loadState, input.ChatID)
+// chatTurn answers messages the user sent in a row as one turn.
+func (f *Flows) chatTurn(ctx context.Context, chatID int64, texts []string) error {
+	st, err := workflow.Step(ctx, f.loadState, chatID)
 	if err != nil {
-		return workflows.ChatResult{}, err
+		return err
 	}
-
-	var history, turn []workflowai.ModelMessage
-	if input.Approval != nil {
-		id, ok := findPendingApproval(st.History, input.Approval.Key)
-		if !ok {
-			_, err := workflow.Step(ctx, f.sendReply, reply{ChatID: input.ChatID, Text: "That question has expired, just tell me what you'd like 💫"})
-			return workflows.ChatResult{}, err
-		}
-		history = st.History
-		turn = []workflowai.ModelMessage{{
-			Role:    workflowai.RoleTool,
-			Content: []workflowai.ContentPart{{Type: workflowai.PartToolApprovalResponse, ApprovalID: id, Approved: input.Approval.Approved}},
-		}}
-	} else {
-		// A new message moves on from questions the user didn't answer.
-		history = dropPendingApprovals(st.History)
-		turn = []workflowai.ModelMessage{userMessage(input.Text)}
+	// A new message moves on from questions the user didn't answer.
+	history := dropPendingApprovals(st.History)
+	turn := make([]workflowai.ModelMessage, len(texts))
+	for i, text := range texts {
+		turn[i] = userMessage(text)
 	}
+	_, err = f.respond(ctx, st, history, turn, false, nil)
+	return err
+}
 
-	text, err := f.respond(ctx, st, history, turn, input.Approval != nil, nil)
-	return workflows.ChatResult{Reply: text}, err
+// approvalTurn carries out or cancels the pending tool call the user
+// answered with a button, whose approval ID has the short key.
+func (f *Flows) approvalTurn(ctx context.Context, chatID int64, key string, approved bool) error {
+	st, err := workflow.Step(ctx, f.loadState, chatID)
+	if err != nil {
+		return err
+	}
+	id, ok := findPendingApproval(st.History, key)
+	if !ok {
+		_, err := workflow.Step(ctx, f.sendReply, reply{ChatID: chatID, Text: "That question has expired, just tell me what you'd like 💫"})
+		return err
+	}
+	turn := []workflowai.ModelMessage{{
+		Role:    workflowai.RoleTool,
+		Content: []workflowai.ContentPart{{Type: workflowai.PartToolApprovalResponse, ApprovalID: id, Approved: approved}},
+	}}
+	_, err = f.respond(ctx, st, st.History, turn, true, nil)
+	return err
 }
 
 // respond runs the agent on history followed by turn, saves the new

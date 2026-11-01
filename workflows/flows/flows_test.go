@@ -170,3 +170,22 @@ func TestTranscript(t *testing.T) {
 		t.Fatalf("transcript:\n%s\nwant:\n%s", got, want)
 	}
 }
+
+func TestGroupMail(t *testing.T) {
+	mails := []store.Mail{
+		{Text: "hey"}, {Text: "so about Sarah"}, {Text: "her bday is May 3"},
+		{ApprovalKey: "k", Approved: true},
+		{Nudge: "say hi"},
+		{Text: "thanks"},
+	}
+	var sizes []int
+	for _, group := range groupMail(mails) {
+		sizes = append(sizes, len(group))
+	}
+	if !slices.Equal(sizes, []int{3, 1, 1, 1}) {
+		t.Fatalf("group sizes = %v", sizes)
+	}
+	if groups := groupMail(nil); len(groups) != 0 {
+		t.Fatalf("groups of no mail = %v", groups)
+	}
+}

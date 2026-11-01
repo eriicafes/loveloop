@@ -51,7 +51,7 @@ var GetRunners = got.TryUsing(func(c *got.Container) (worlds.RunnerSet, error) {
 		return nil, err
 	}
 	return worlds.Runners(
-		workflow.Use(f.Chat),
+		workflow.Use(f.Conversation),
 		workflow.Use(f.CheckIns),
 		workflow.Use(f.Reminder),
 	), nil

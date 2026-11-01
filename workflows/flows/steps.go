@@ -114,14 +114,14 @@ type draft struct {
 
 // sendDraft shows a draft to the user with buttons that open it in WhatsApp
 // or Telegram, ready to send to their loved one.
-func (f *Flows) sendDraft(ctx context.Context, input scoped[draft]) (string, error) {
-	person, err := f.Store.Person(ctx, input.ChatID, input.Input.Person)
+func (u userTools) sendDraft(ctx context.Context, in draft) (string, error) {
+	person, err := u.Store.Person(ctx, u.ChatID, in.Person)
 	if errors.Is(err, store.ErrNotFound) {
-		person = store.Person{Name: input.Input.Person}
+		person = store.Person{Name: in.Person}
 	} else if err != nil {
 		return "", err
 	}
-	text := input.Input.Text
+	text := in.Text
 	var buttons []telegram.InlineKeyboardButton
 	if phone := digits(person.Phone); phone != "" {
 		buttons = append(buttons, telegram.InlineKeyboardButton{Text: "💬 WhatsApp", URL: "https://wa.me/" + phone + "?text=" + url.QueryEscape(text)})
@@ -131,8 +131,8 @@ func (f *Flows) sendDraft(ctx context.Context, input scoped[draft]) (string, err
 	} else {
 		buttons = append(buttons, telegram.InlineKeyboardButton{Text: "✈️ Share", URL: "https://t.me/share/url?url=" + url.QueryEscape(text)})
 	}
-	err = f.Bot.SendMessage(ctx, telegram.SendMessageParams{
-		ChatID:      input.ChatID,
+	err = u.Bot.SendMessage(ctx, telegram.SendMessageParams{
+		ChatID:      u.ChatID,
 		Text:        fmt.Sprintf("💌 For %s:\n\n%s", person.Name, text),
 		ReplyMarkup: &telegram.InlineKeyboardMarkup{InlineKeyboard: [][]telegram.InlineKeyboardButton{buttons}},
 	})

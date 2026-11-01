@@ -1,6 +1,7 @@
 package flows
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,7 +9,6 @@ import (
 	"reflect"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/digitallysavvy/go-ai/pkg/ai"
@@ -53,6 +53,10 @@ your check-ins and reminders depend on it.`
 func (f *Flows) newAgent(st state, now time.Time) *workflowai.WorkflowAgent {
 	chatID := st.User.ChatID
 	loc := st.User.Location()
+	// active counts the user's reminders, including ones scheduled earlier
+	// in this turn. Tool calls replay in order, so it replays the same.
+	active := len(st.Reminders)
+	u := userTools{Flows: f, ChatID: chatID}
 	return workflowai.NewWorkflowAgent(workflowai.WorkflowAgentOptions{
 		ID:           "loveloop",
 		Model:        f.Model,
@@ -60,35 +64,47 @@ func (f *Flows) newAgent(st state, now time.Time) *workflowai.WorkflowAgent {
 		Tools: workflowai.ToolSet{
 			"rememberPerson": {
 				Description: "Create or update a loved one. Only the fields you set change; list fields are added to.",
-				Execute:     userStep(chatID, f.rememberPerson),
+				InputSchema: schemaFor[personInput](),
+				Execute:     workflowai.ExecuteStep(u.rememberPerson),
 			},
 			"forgetPerson": {
 				Description:   "Forget a loved one and everything about them. Asks the user to confirm.",
 				NeedsApproval: workflowai.NeedsApprovalAlways,
-				Execute:       userStep(chatID, f.forgetPerson),
+				InputSchema:   schemaFor[nameInput](),
+				Execute:       workflowai.ExecuteStep(u.forgetPerson),
 			},
 			"logContact": {
 				Description: "Record that the user was just in touch with a loved one.",
-				Execute:     userStep(chatID, f.logContact),
+				InputSchema: schemaFor[contactInput](),
+				Execute:     workflowai.ExecuteStep(u.logContact),
 			},
 			"draftText": {
 				Description: "Show the user a sweet text to send a loved one, with buttons to send it.",
-				Execute:     userStep(chatID, f.sendDraft),
+				InputSchema: schemaFor[draft](),
+				Execute:     workflowai.ExecuteStep(u.sendDraft),
 			},
 			"scheduleReminder": {
-				Description: "Remind the user about something at a local date and time, once or repeating.",
+				Description: fmt.Sprintf("Remind the user about something at a local date and time, once or repeating. "+
+					"Reminders can be at most a year ahead, repeat at most daily and at least yearly, and a user can have "+
+					"at most %d; if they hit that, offer to cancel old ones.", maxActiveReminders),
 				InputSchema: schemaFor[reminderInput](),
 				Execute: workflowai.ExecuteFunc(func(ctx context.Context, raw json.RawMessage, _ workflowai.ToolCallOptions) (any, error) {
-					return f.scheduleReminder(ctx, chatID, loc, raw)
+					scheduled, err := f.scheduleReminder(ctx, chatID, loc, active, raw)
+					if err == nil {
+						active++
+					}
+					return scheduled, err
 				}),
 			},
 			"cancelReminder": {
 				Description: "Cancel one of the user's reminders by its id.",
-				Execute:     userStep(chatID, f.cancelReminder),
+				InputSchema: schemaFor[reminderID](),
+				Execute:     workflowai.ExecuteStep(u.cancelReminder),
 			},
 			"updateSettings": {
 				Description: "Change the user's name, time zone, waking hours, daily check-ins, or pause them.",
-				Execute:     userStep(chatID, f.updateSettings),
+				InputSchema: schemaFor[settingsInput](),
+				Execute:     workflowai.ExecuteStep(u.updateSettings),
 			},
 		},
 		StopWhen:           []workflowai.StopCondition{workflowai.IsStepCount(8)},
@@ -103,7 +119,7 @@ func describe(st state, now time.Time) string {
 	local := now.In(loc)
 	var b strings.Builder
 	fmt.Fprintf(&b, "Current time for the user: %s (%s).\n", local.Format("Monday, 2 January 2006 15:04"), loc)
-	fmt.Fprintf(&b, "User: %s. Time zone: %s. Check-ins: %d a day between %02d:00 and %02d:00", st.User.Name, cmpOr(st.User.Timezone, "not set"), st.User.CheckInsPerDay, st.User.WakeHour, st.User.SleepHour)
+	fmt.Fprintf(&b, "User: %s. Time zone: %s. Check-ins: %d a day between %02d:00 and %02d:00", st.User.Name, cmp.Or(st.User.Timezone, "not set"), st.User.CheckInsPerDay, st.User.WakeHour, st.User.SleepHour)
 	if st.User.Paused {
 		b.WriteString(", paused")
 	}
@@ -165,44 +181,19 @@ func daysUntil(date string, now time.Time) (int, bool) {
 	return int(next.Sub(today).Hours() / 24), true
 }
 
-func cmpOr(value, fallback string) string {
-	if value == "" {
-		return fallback
-	}
-	return value
-}
-
-// scoped is the input of a step that acts for one user. The model only sees
-// Input's schema, and ChatID comes from the run.
+// scoped is the input of a step that acts for one user.
 type scoped[In any] struct {
 	ChatID int64 `json:"chatId"`
 	Input  In    `json:"input"`
 }
 
-type userStepExecutor[In, Out any] struct {
-	chatID int64
-	fn     func(context.Context, scoped[In]) (Out, error)
-	schema func() map[string]any
+// userTools holds the agent's tool steps for one user. They reach Flows'
+// dependencies and the user's chat ID through the receiver, so the model's
+// tool input is all they take, and the model can't pick another user.
+type userTools struct {
+	*Flows
+	ChatID int64
 }
-
-// userStep returns an Executor that runs fn as a background step for the
-// user of chatID, with the tool call's input.
-func userStep[In, Out any](chatID int64, fn func(context.Context, scoped[In]) (Out, error)) workflowai.Executor {
-	return userStepExecutor[In, Out]{chatID: chatID, fn: fn, schema: sync.OnceValue(schemaFor[In])}
-}
-
-func (e userStepExecutor[In, Out]) Execute(ctx context.Context, raw json.RawMessage, _ workflowai.ToolCallOptions) *workflow.Result[any] {
-	var input In
-	if err := json.Unmarshal(raw, &input); err != nil {
-		return workflow.NewResult[any](nil, fmt.Errorf("decode tool input: %w", err))
-	}
-	result := workflow.Background(ctx, e.fn, scoped[In]{ChatID: e.chatID, Input: input})
-	return workflow.Then(ctx, result, func(output Out, err error) *workflow.Result[any] {
-		return workflow.NewResult[any](output, err)
-	})
-}
-
-func (e userStepExecutor[In, Out]) InputSchema() map[string]any { return e.schema() }
 
 // schemaFor returns the JSON schema of T's JSON fields, with each field's
 // desc tag as its description.
@@ -218,12 +209,6 @@ func schemaFor[T any]() map[string]any {
 		}
 	}
 	return schema
-}
-
-// userError reports a mistake in a tool call to the model without retrying
-// the step.
-func userError(format string, args ...any) error {
-	return workflow.FatalError(fmt.Errorf(format, args...))
 }
 
 type personInput struct {
@@ -243,19 +228,18 @@ type personInput struct {
 	Forget          []string `json:"forget,omitempty" desc:"Likes, dislikes or notes that are no longer true, as saved."`
 }
 
-func (f *Flows) rememberPerson(ctx context.Context, input scoped[personInput]) (store.Person, error) {
-	in := input.Input
+func (u userTools) rememberPerson(ctx context.Context, in personInput) (store.Person, error) {
 	if strings.TrimSpace(in.Name) == "" {
-		return store.Person{}, userError("name is required")
+		return store.Person{}, workflow.FatalError(errors.New("name is required"))
 	}
-	person, err := f.Store.Person(ctx, input.ChatID, in.Name)
+	person, err := u.Store.Person(ctx, u.ChatID, in.Name)
 	if errors.Is(err, store.ErrNotFound) {
 		person = store.Person{Name: strings.TrimSpace(in.Name)}
 	} else if err != nil {
 		return store.Person{}, err
 	}
 	if in.Rename != "" && store.PersonKey(in.Rename) != person.Key() {
-		if err := f.Store.DeletePerson(ctx, input.ChatID, person.Name); err != nil && !errors.Is(err, store.ErrNotFound) {
+		if err := u.Store.DeletePerson(ctx, u.ChatID, person.Name); err != nil && !errors.Is(err, store.ErrNotFound) {
 			return store.Person{}, err
 		}
 		person.Name = strings.TrimSpace(in.Rename)
@@ -279,7 +263,7 @@ func (f *Flows) rememberPerson(ctx context.Context, input scoped[personInput]) (
 	person.Dislikes = merge(person.Dislikes, in.AddDislikes, in.Forget)
 	person.Notes = merge(person.Notes, in.AddNotes, in.Forget)
 	person.UpdatedAt = time.Now()
-	return person, f.Store.SavePerson(ctx, input.ChatID, person)
+	return person, u.Store.SavePerson(ctx, u.ChatID, person)
 }
 
 // merge adds to list the values it lacks and removes the forgotten ones,
@@ -301,8 +285,8 @@ type nameInput struct {
 	Name string `json:"name" desc:"The loved one's name, as saved."`
 }
 
-func (f *Flows) forgetPerson(ctx context.Context, input scoped[nameInput]) (string, error) {
-	err := f.Store.DeletePerson(ctx, input.ChatID, input.Input.Name)
+func (u userTools) forgetPerson(ctx context.Context, in nameInput) (string, error) {
+	err := u.Store.DeletePerson(ctx, u.ChatID, in.Name)
 	if errors.Is(err, store.ErrNotFound) {
 		return "", workflow.FatalError(err)
 	}
@@ -314,8 +298,8 @@ type contactInput struct {
 	Note string `json:"note,omitempty" desc:"Anything worth remembering from the conversation."`
 }
 
-func (f *Flows) logContact(ctx context.Context, input scoped[contactInput]) (store.Person, error) {
-	person, err := f.Store.Person(ctx, input.ChatID, input.Input.Name)
+func (u userTools) logContact(ctx context.Context, in contactInput) (store.Person, error) {
+	person, err := u.Store.Person(ctx, u.ChatID, in.Name)
 	if errors.Is(err, store.ErrNotFound) {
 		return store.Person{}, workflow.FatalError(fmt.Errorf("%w; save them with rememberPerson first", err))
 	} else if err != nil {
@@ -323,15 +307,15 @@ func (f *Flows) logContact(ctx context.Context, input scoped[contactInput]) (sto
 	}
 	person.LastContactAt = time.Now()
 	person.UpdatedAt = person.LastContactAt
-	person.Notes = merge(person.Notes, []string{input.Input.Note}, nil)
-	return person, f.Store.SavePerson(ctx, input.ChatID, person)
+	person.Notes = merge(person.Notes, []string{in.Note}, nil)
+	return person, u.Store.SavePerson(ctx, u.ChatID, person)
 }
 
 type reminderInput struct {
 	At        string `json:"at" desc:"Local date and time in the user's time zone, YYYY-MM-DDTHH:MM."`
 	About     string `json:"about" desc:"What to remind the user about, in a few words."`
 	Person    string `json:"person,omitempty" desc:"The loved one it is about, if any."`
-	EveryDays int    `json:"everyDays,omitempty" desc:"Repeat every this many days, for example 7 for weekly."`
+	EveryDays int    `json:"everyDays,omitempty" desc:"Repeat every this many days, 1 to 365, for example 7 for weekly. Omit for once."`
 }
 
 type scheduledReminder struct {
@@ -340,9 +324,21 @@ type scheduledReminder struct {
 	EveryDays int    `json:"everyDays,omitempty"`
 }
 
+// Reminder limits keep the work they schedule small. A Reminder run waits in
+// sleeps of at most maxSleep, under the seven days Vercel Queues and the
+// QStash free plan can delay, so no reminder needs QStash, and a year-ahead
+// reminder wakes about sixty times on the way. Daily repeats and a cap per
+// user bound how often reminders fire.
+const (
+	maxReminderAhead   = 366 * 24 * time.Hour
+	maxReminderEvery   = 365
+	maxActiveReminders = 20
+)
+
 // scheduleReminder starts a Reminder run, which sleeps until the reminder is
-// due, and saves it under the run's ID. It runs in workflow context.
-func (f *Flows) scheduleReminder(ctx context.Context, chatID int64, loc *time.Location, raw json.RawMessage) (scheduledReminder, error) {
+// due, and saves it under the run's ID. active is how many reminders the
+// user has. It runs in workflow context.
+func (f *Flows) scheduleReminder(ctx context.Context, chatID int64, loc *time.Location, active int, raw json.RawMessage) (scheduledReminder, error) {
 	var in reminderInput
 	if err := json.Unmarshal(raw, &in); err != nil {
 		return scheduledReminder{}, err
@@ -358,8 +354,14 @@ func (f *Flows) scheduleReminder(ctx context.Context, chatID int64, loc *time.Lo
 	if !at.After(now) {
 		return scheduledReminder{}, fmt.Errorf("%s is in the past; it is now %s", in.At, now.In(loc).Format("2006-01-02T15:04"))
 	}
-	if in.EveryDays < 0 {
-		return scheduledReminder{}, errors.New("everyDays cannot be negative")
+	if at.Sub(now) > maxReminderAhead {
+		return scheduledReminder{}, errors.New("reminders can be at most a year ahead; suggest a nearer date, or a yearly repeat")
+	}
+	if in.EveryDays < 0 || in.EveryDays > maxReminderEvery {
+		return scheduledReminder{}, fmt.Errorf("everyDays must be between 1 and %d, or 0 for once", maxReminderEvery)
+	}
+	if active >= maxActiveReminders {
+		return scheduledReminder{}, fmt.Errorf("the user already has %d reminders, the most allowed; offer to cancel some first", active)
 	}
 	run, err := workflow.Start(ctx, workflows.Reminder{ChatID: chatID, At: at, About: in.About, Person: in.Person, EveryDays: in.EveryDays})
 	if err != nil {
@@ -380,20 +382,20 @@ type reminderID struct {
 	ID string `json:"id" desc:"The reminder's id."`
 }
 
-func (f *Flows) cancelReminder(ctx context.Context, input scoped[reminderID]) (string, error) {
-	if _, err := f.Store.Reminder(ctx, input.ChatID, input.Input.ID); errors.Is(err, store.ErrNotFound) {
+func (u userTools) cancelReminder(ctx context.Context, in reminderID) (string, error) {
+	if _, err := u.Store.Reminder(ctx, u.ChatID, in.ID); errors.Is(err, store.ErrNotFound) {
 		return "", workflow.FatalError(err)
 	} else if err != nil {
 		return "", err
 	}
-	run, err := workflow.Get[workflows.ReminderResult](ctx, input.Input.ID)
+	run, err := workflow.Get[workflows.ReminderResult](ctx, in.ID)
 	if err != nil {
 		return "", err
 	}
 	if err := run.Cancel(ctx); err != nil {
 		return "", err
 	}
-	return "Cancelled.", f.Store.DeleteReminder(ctx, input.ChatID, input.Input.ID)
+	return "Cancelled.", u.Store.DeleteReminder(ctx, u.ChatID, in.ID)
 }
 
 type settingsInput struct {
@@ -405,18 +407,17 @@ type settingsInput struct {
 	Paused         *bool  `json:"paused,omitempty" desc:"True to pause check-ins, false to resume them. Reminders still fire."`
 }
 
-func (f *Flows) updateSettings(ctx context.Context, input scoped[settingsInput]) (store.User, error) {
-	user, err := f.Store.User(ctx, input.ChatID)
+func (u userTools) updateSettings(ctx context.Context, in settingsInput) (store.User, error) {
+	user, err := u.Store.User(ctx, u.ChatID)
 	if err != nil {
 		return store.User{}, err
 	}
-	in := input.Input
 	if in.Name != "" {
 		user.Name = in.Name
 	}
 	if in.Timezone != "" {
 		if _, err := time.LoadLocation(in.Timezone); err != nil {
-			return store.User{}, userError("unknown time zone %q, use an IANA name such as Europe/London", in.Timezone)
+			return store.User{}, workflow.FatalError(fmt.Errorf("unknown time zone %q, use an IANA name such as Europe/London", in.Timezone))
 		}
 		user.Timezone = in.Timezone
 	}
@@ -428,7 +429,7 @@ func (f *Flows) updateSettings(ctx context.Context, input scoped[settingsInput])
 			continue
 		}
 		if *hour.value < 0 || *hour.value > 23 {
-			return store.User{}, userError("hours are 0 to 23")
+			return store.User{}, workflow.FatalError(errors.New("hours are 0 to 23"))
 		}
 		*hour.field = *hour.value
 	}
@@ -438,5 +439,5 @@ func (f *Flows) updateSettings(ctx context.Context, input scoped[settingsInput])
 	if in.Paused != nil {
 		user.Paused = *in.Paused
 	}
-	return user, f.Store.SaveUser(ctx, user)
+	return user, u.Store.SaveUser(ctx, user)
 }

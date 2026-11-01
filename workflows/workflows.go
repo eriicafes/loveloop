@@ -8,25 +8,20 @@ import (
 	"github.com/eriicafes/go-workflow"
 )
 
-// Chat answers one message from the user, or their answer to a question the
-// agent asked with buttons.
-type Chat struct {
-	workflow.Struct[ChatResult]
-	ChatID int64  `json:"chatId"`
-	Text   string `json:"text,omitempty"`
-	// Approval answers a pending tool approval instead of Text.
-	Approval *ApprovalAnswer `json:"approval,omitempty"`
+// Conversation answers a user's mailbox in order: their messages, their
+// answers to approval questions, and LoveLoop's own check-ins and
+// reminders. One runs per user at a time, and it ends once the mailbox stays
+// empty for a while. Use Deliver rather than starting it directly.
+type Conversation struct {
+	workflow.Struct[ConversationResult]
+	ChatID int64 `json:"chatId"`
 }
 
-// ApprovalAnswer is the user's tap on an approval button. Key is the short
-// key of the approval ID that fits in Telegram callback data.
-type ApprovalAnswer struct {
-	Key      string `json:"key"`
-	Approved bool   `json:"approved"`
-}
-
-type ChatResult struct {
-	Reply string `json:"reply"`
+type ConversationResult struct {
+	// Turns is how many times the agent answered.
+	Turns int `json:"turns"`
+	// Failed is how many of those turns failed after telling the user.
+	Failed int `json:"failed,omitempty"`
 }
 
 // CheckIns texts the user first a few times at random over the next day,
