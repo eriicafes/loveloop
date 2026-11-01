@@ -208,3 +208,54 @@ func waitFor(t *testing.T, what string, done func() bool) {
 		time.Sleep(20 * time.Millisecond)
 	}
 }
+
+// TestScheduleReminderLimit checks that a user at the reminder limit gets no
+// new reminder, and that the agent hears why.
+func TestScheduleReminderLimit(t *testing.T) {
+	var mu sync.Mutex
+	var prompts []string
+	model := &testutil.MockLanguageModel{
+		ToolSupport: true,
+		DoGenerateFunc: func(ctx context.Context, opts *provider.GenerateOptions) (*types.GenerateResult, error) {
+			// JSON shows the tool results, which %+v prints as pointers.
+			prompt, err := json.Marshal(opts.Prompt)
+			if err != nil {
+				return nil, err
+			}
+			mu.Lock()
+			prompts = append(prompts, string(prompt))
+			call := len(prompts)
+			mu.Unlock()
+			if call == 1 {
+				at := time.Now().Add(48 * time.Hour).UTC().Format("2006-01-02T15:04")
+				return &types.GenerateResult{
+					FinishReason: types.FinishReasonToolCalls,
+					ToolCalls: []types.ToolCall{{
+						ID:        "call-1",
+						ToolName:  "scheduleReminder",
+						Arguments: map[string]any{"at": at, "about": "call mom"},
+					}},
+				}, nil
+			}
+			return &types.GenerateResult{Text: "You're at the limit", FinishReason: types.FinishReasonStop}, nil
+		},
+	}
+	ct := newConversationTest(t, model)
+	for i := range maxActiveReminders {
+		reminder := store.Reminder{ID: fmt.Sprintf("r%d", i), At: time.Now().Add(time.Hour), About: "existing"}
+		if err := ct.store.SaveReminder(t.Context(), testChatID, reminder); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	ct.deliver(t, "remind me to call mom in two days")
+	waitFor(t, "a reply", func() bool { return len(ct.replies()) == 1 })
+	if count, err := ct.store.ReminderCount(t.Context(), testChatID); err != nil || count != maxActiveReminders {
+		t.Fatalf("reminders = %d, %v", count, err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(prompts) != 2 || !strings.Contains(prompts[1], "the most allowed") {
+		t.Fatalf("the agent did not hear about the limit: %d calls", len(prompts))
+	}
+}

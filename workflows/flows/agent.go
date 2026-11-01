@@ -52,10 +52,6 @@ your check-ins and reminders depend on it.`
 // the run's current time.
 func (f *Flows) newAgent(st state, now time.Time) *workflowai.WorkflowAgent {
 	chatID := st.User.ChatID
-	loc := st.User.Location()
-	// active counts the user's reminders, including ones scheduled earlier
-	// in this turn. Tool calls replay in order, so it replays the same.
-	active := len(st.Reminders)
 	u := userTools{Flows: f, ChatID: chatID}
 	return workflowai.NewWorkflowAgent(workflowai.WorkflowAgentOptions{
 		ID:           "loveloop",
@@ -89,11 +85,7 @@ func (f *Flows) newAgent(st state, now time.Time) *workflowai.WorkflowAgent {
 					"at most %d; if they hit that, offer to cancel old ones.", maxActiveReminders),
 				InputSchema: schemaFor[reminderInput](),
 				Execute: workflowai.ExecuteFunc(func(ctx context.Context, raw json.RawMessage, _ workflowai.ToolCallOptions) (any, error) {
-					scheduled, err := f.scheduleReminder(ctx, chatID, loc, active, raw)
-					if err == nil {
-						active++
-					}
-					return scheduled, err
+					return u.scheduleReminder(ctx, st.User.Location(), raw)
 				}),
 			},
 			"cancelReminder": {
@@ -324,6 +316,10 @@ type scheduledReminder struct {
 	EveryDays int    `json:"everyDays,omitempty"`
 }
 
+func (u userTools) reminderCount(ctx context.Context, _ struct{}) (int64, error) {
+	return u.Store.ReminderCount(ctx, u.ChatID)
+}
+
 // Reminder limits keep the work they schedule small. A Reminder run waits in
 // sleeps of at most maxSleep, under the seven days Vercel Queues and the
 // QStash free plan can delay, so no reminder needs QStash, and a year-ahead
@@ -336,9 +332,9 @@ const (
 )
 
 // scheduleReminder starts a Reminder run, which sleeps until the reminder is
-// due, and saves it under the run's ID. active is how many reminders the
-// user has. It runs in workflow context.
-func (f *Flows) scheduleReminder(ctx context.Context, chatID int64, loc *time.Location, active int, raw json.RawMessage) (scheduledReminder, error) {
+// due, and saves it under the run's ID. It runs in workflow context, with the
+// time read in the user's time zone loc.
+func (u userTools) scheduleReminder(ctx context.Context, loc *time.Location, raw json.RawMessage) (scheduledReminder, error) {
 	var in reminderInput
 	if err := json.Unmarshal(raw, &in); err != nil {
 		return scheduledReminder{}, err
@@ -360,15 +356,19 @@ func (f *Flows) scheduleReminder(ctx context.Context, chatID int64, loc *time.Lo
 	if in.EveryDays < 0 || in.EveryDays > maxReminderEvery {
 		return scheduledReminder{}, fmt.Errorf("everyDays must be between 1 and %d, or 0 for once", maxReminderEvery)
 	}
-	if active >= maxActiveReminders {
-		return scheduledReminder{}, fmt.Errorf("the user already has %d reminders, the most allowed; offer to cancel some first", active)
+	count, err := workflow.Step(ctx, u.reminderCount, struct{}{})
+	if err != nil {
+		return scheduledReminder{}, err
 	}
-	run, err := workflow.Start(ctx, workflows.Reminder{ChatID: chatID, At: at, About: in.About, Person: in.Person, EveryDays: in.EveryDays})
+	if count >= maxActiveReminders {
+		return scheduledReminder{}, fmt.Errorf("the user already has %d reminders, the most allowed; offer to cancel some first", count)
+	}
+	run, err := workflow.Start(ctx, workflows.Reminder{ChatID: u.ChatID, At: at, About: in.About, Person: in.Person, EveryDays: in.EveryDays})
 	if err != nil {
 		return scheduledReminder{}, err
 	}
 	reminder := store.Reminder{ID: run.ID(), At: at, About: in.About, Person: in.Person, EveryDays: in.EveryDays, CreatedAt: now}
-	if _, err := workflow.Step(ctx, f.saveReminder, scoped[store.Reminder]{ChatID: chatID, Input: reminder}); err != nil {
+	if _, err := workflow.Step(ctx, u.saveReminder, scoped[store.Reminder]{ChatID: u.ChatID, Input: reminder}); err != nil {
 		return scheduledReminder{}, err
 	}
 	return scheduledReminder{ID: run.ID(), At: at.Format("Mon 2 Jan 2006 15:04"), EveryDays: in.EveryDays}, nil

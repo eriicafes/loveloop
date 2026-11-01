@@ -251,6 +251,11 @@ func (s *Store) Reminders(ctx context.Context, chatID int64) ([]Reminder, error)
 	return reminders, nil
 }
 
+// ReminderCount returns how many reminders the user has.
+func (s *Store) ReminderCount(ctx context.Context, chatID int64) (int64, error) {
+	return s.rdb.HLen(ctx, s.key("reminders", chatID)).Result()
+}
+
 // Reminder returns one reminder, or ErrNotFound when it was cancelled or
 // has fired for the last time.
 func (s *Store) Reminder(ctx context.Context, chatID int64, id string) (Reminder, error) {
