@@ -1,0 +1,17 @@
+{{/*
+  ui/badge props:
+    children  string or template
+    variant   default | success | warning | destructive | outline
+    class
+*/}}
+{{ define "ui/badge" }}
+<span class="{{ clsx
+  "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold"
+  (or (not .variant) (eq .variant "default")) "bg-accent text-accent-foreground"
+  (eq .variant "success") "bg-success-soft text-success"
+  (eq .variant "warning") "bg-warning-soft text-warning"
+  (eq .variant "destructive") "bg-destructive-soft text-destructive"
+  (eq .variant "outline") "border text-muted-foreground"
+  .class
+}}">{{ render .children }}</span>
+{{ end }}

@@ -1,0 +1,90 @@
+/* Vite's root is the repo, so scan only the sources listed below. */
+@import "tailwindcss" source(none);
+
+/* Classes live in the templates and in Go page structs. */
+@source "../templates/**/*.{html,go}";
+@source "../*.go";
+
+@custom-variant dark (@media (prefers-color-scheme: dark));
+
+:root {
+  --background: oklch(0.985 0.008 350);
+  --foreground: oklch(0.24 0.03 350);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--foreground);
+  --muted: oklch(0.96 0.012 350);
+  --muted-foreground: oklch(0.52 0.03 350);
+  --border: oklch(0.92 0.02 350);
+  --input: oklch(0.9 0.02 350);
+  --ring: oklch(0.65 0.2 0);
+  --primary: oklch(0.62 0.21 0);
+  --primary-foreground: oklch(0.99 0 0);
+  --accent: oklch(0.95 0.03 355);
+  --accent-foreground: oklch(0.3 0.06 355);
+  --success: oklch(0.6 0.13 160);
+  --success-soft: oklch(0.95 0.04 160);
+  --warning: oklch(0.62 0.13 70);
+  --warning-soft: oklch(0.96 0.05 80);
+  --destructive: oklch(0.58 0.2 25);
+  --destructive-soft: oklch(0.95 0.03 25);
+  --radius: 0.875rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: oklch(0.17 0.015 350);
+    --foreground: oklch(0.95 0.015 350);
+    --card: oklch(0.21 0.02 350);
+    --card-foreground: var(--foreground);
+    --muted: oklch(0.26 0.02 350);
+    --muted-foreground: oklch(0.72 0.03 350);
+    --border: oklch(0.3 0.025 350);
+    --input: oklch(0.34 0.025 350);
+    --ring: oklch(0.72 0.17 0);
+    --primary: oklch(0.72 0.17 0);
+    --primary-foreground: oklch(0.2 0.02 350);
+    --accent: oklch(0.3 0.05 355);
+    --accent-foreground: oklch(0.92 0.04 355);
+    --success: oklch(0.78 0.14 160);
+    --success-soft: oklch(0.3 0.05 160);
+    --warning: oklch(0.82 0.13 80);
+    --warning-soft: oklch(0.32 0.05 75);
+    --destructive: oklch(0.72 0.17 25);
+    --destructive-soft: oklch(0.3 0.06 25);
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-destructive: var(--destructive);
+  --color-destructive-soft: var(--destructive-soft);
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}

@@ -1,0 +1,39 @@
+<main class="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4 py-12">
+  <div class="mb-8 flex flex-col items-center gap-3 text-center">
+    <div class="grid size-14 place-items-center rounded-2xl bg-accent text-3xl">💞</div>
+    <div>
+      <h1 class="text-2xl font-semibold tracking-tight">LoveLoop</h1>
+      <p class="text-sm text-muted-foreground">Sign in to set up your bot.</p>
+    </div>
+  </div>
+
+  {{ template "ui/card" props "children" (tmpl "login-form" .) }}
+</main>
+
+{{ define "login-form" }}
+{{ template "ui/card-content" props "class" "pt-6" "children" (tmpl "login-fields" .) }}
+{{ end }}
+
+{{ define "login-fields" }}
+{{ if not .Configured }}
+{{ template "ui/alert" props
+  "variant" "destructive"
+  "title" "No password set"
+  "children" "Set SETUP_PASSWORD in the environment to use the setup page."
+}}
+{{ else }}
+<form method="post" action="/login" class="flex flex-col gap-4">
+  {{ with .Error }}
+  {{ template "ui/alert" props "variant" "destructive" "children" . }}
+  {{ end }}
+  <div class="flex flex-col gap-2">
+    {{ template "ui/label" props "for" "password" "children" "Password" }}
+    {{ template "ui/input" props
+      "id" "password" "name" "password" "type" "password"
+      "autocomplete" "current-password" "required" true "autofocus" true
+    }}
+  </div>
+  {{ template "ui/button" props "type" "submit" "class" "w-full" "children" "Sign in" }}
+</form>
+{{ end }}
+{{ end }}

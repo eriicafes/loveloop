@@ -1,0 +1,26 @@
+{{/* ui/card and its parts take props: children, class. */}}
+{{ define "ui/card" }}
+<section class="{{ clsx "rounded-xl border bg-card text-card-foreground shadow-sm" .class }}">
+  {{ render .children }}
+</section>
+{{ end }}
+
+{{ define "ui/card-header" }}
+<div class="{{ clsx "flex flex-col gap-1.5 p-6 pb-4" .class }}">{{ render .children }}</div>
+{{ end }}
+
+{{ define "ui/card-title" }}
+<h2 class="{{ clsx "text-base font-semibold leading-none tracking-tight" .class }}">{{ render .children }}</h2>
+{{ end }}
+
+{{ define "ui/card-description" }}
+<p class="{{ clsx "text-sm text-muted-foreground" .class }}">{{ render .children }}</p>
+{{ end }}
+
+{{ define "ui/card-content" }}
+<div class="{{ clsx "px-6 pb-6" .class }}">{{ render .children }}</div>
+{{ end }}
+
+{{ define "ui/card-footer" }}
+<div class="{{ clsx "flex items-center gap-2 border-t px-6 py-4" .class }}">{{ render .children }}</div>
+{{ end }}

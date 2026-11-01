@@ -1,0 +1,4 @@
+# dist is embedded into the Go binary; keep the directory so go:embed
+# compiles before the first build.
+dist/*
+!dist/.gitkeep

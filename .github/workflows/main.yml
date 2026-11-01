@@ -1,0 +1,81 @@
+name: main
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 10
+    env:
+      REDIS_URL: redis://localhost:6379
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Test
+        run: go test -race ./...
+
+  checks:
+    name: Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Format
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "Run gofmt -w on:"
+            echo "$unformatted"
+            exit 1
+          fi
+      - name: Tidy
+        run: go mod tidy -diff
+      - name: Vet
+        run: go vet ./...
+      - name: Workflow analyzer
+        # Build the analyzer from the go-workflow module go.mod requires, as
+        # workflowdev.Check does in cmd/dev, so it matches the library.
+        run: |
+          go mod download github.com/eriicafes/go-workflow
+          dir=$(go list -m -f '{{.Dir}}' github.com/eriicafes/go-workflow)
+          (cd "$dir" && go build -o "$RUNNER_TEMP/workflowcheck" ./cmd/workflowcheck)
+          go vet -vettool="$RUNNER_TEMP/workflowcheck" ./...
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Build assets
+        run: pnpm build
+      - name: Build
+        run: go build ./...

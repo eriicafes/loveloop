@@ -1,0 +1,4 @@
+{{/* ui/label props: for, children, class. */}}
+{{ define "ui/label" }}
+<label {{ with .for }}for="{{ . }}"{{ end }} class="{{ clsx "text-sm font-medium leading-none" .class }}">{{ render .children }}</label>
+{{ end }}
