@@ -87,8 +87,9 @@ page afterwards.
 
 ## Deploy to Vercel
 
-1. Create the project and add an Upstash Redis integration (set `REDIS_URL`
-   to its `rediss://` URL), and enable Vercel Queues.
+1. Create the project, add the Upstash Redis integration, and enable Vercel
+   Queues. LoveLoop's data uses `REDIS_URL`, and the workflow World uses
+   `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
 2. Set the environment variables from `.env.example`: `TELEGRAM_BOT_TOKEN`,
    `TELEGRAM_WEBHOOK_SECRET`, `SETUP_PASSWORD`, `TOOL_APPROVAL_SECRET`, and
    optionally `TELEGRAM_ALLOWED_USERS` and `MODEL`. The AI Gateway uses the

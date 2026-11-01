@@ -70,6 +70,7 @@ func checks() []pages.Check {
 		{Name: "Bot token", Detail: "TELEGRAM_BOT_TOKEN", OK: set("TELEGRAM_BOT_TOKEN")},
 		{Name: "Webhook secret", Detail: "TELEGRAM_WEBHOOK_SECRET", OK: set("TELEGRAM_WEBHOOK_SECRET")},
 		{Name: "Redis", Detail: "REDIS_URL", OK: set("REDIS_URL")},
+		{Name: "Workflow Redis", Detail: "UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN", OK: set("UPSTASH_REDIS_REST_URL") && set("UPSTASH_REDIS_REST_TOKEN")},
 		{Name: "Model", Detail: model, OK: set("AI_GATEWAY_API_KEY") || set("ANTHROPIC_API_KEY") || set("VERCEL_OIDC_TOKEN")},
 		{Name: "Approval signing", Detail: "TOOL_APPROVAL_SECRET", OK: set("TOOL_APPROVAL_SECRET"), Optional: true},
 		{Name: "Allowed users", Detail: cmp.Or(os.Getenv("TELEGRAM_ALLOWED_USERS"), "Anyone can chat"), OK: set("TELEGRAM_ALLOWED_USERS"), Optional: true},

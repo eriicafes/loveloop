@@ -98,8 +98,8 @@ func New(rdb redis.UniversalClient, prefix string) *Store {
 	return &Store{rdb: rdb, prefix: prefix}
 }
 
-// GetStore returns the Store on REDIS_URL, with keys under
-// LOVELOOP_REDIS_PREFIX or loveloop.
+// GetStore returns the Store on REDIS_URL, the Upstash Redis connection
+// string, with keys under LOVELOOP_REDIS_PREFIX or loveloop.
 var GetStore = got.TryUsing(func(c *got.Container) (*Store, error) {
 	options, err := redis.ParseURL(os.Getenv("REDIS_URL"))
 	if err != nil {

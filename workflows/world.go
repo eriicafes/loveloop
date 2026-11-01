@@ -14,12 +14,13 @@ import (
 // function to.
 const DefaultTopic = "loveloop-workflow"
 
-// GetWorld returns the Vercel World configured from the environment. Clients
-// are built from it with workflow.NewClient.
+// GetWorld returns the Vercel World configured from the environment. It
+// reaches Redis over the Upstash REST API with the credentials the Upstash
+// integration sets on Vercel. Clients are built from it with
+// workflow.NewClient.
 var GetWorld = got.TryUsing(func(c *got.Container) (*vercelworld.World, error) {
 	config := vercelworld.Config{
 		BaseURL:        os.Getenv("WORKFLOW_BASE_URL"),
-		RedisURL:       os.Getenv("REDIS_URL"),
 		RedisRESTURL:   os.Getenv("UPSTASH_REDIS_REST_URL"),
 		RedisRESTToken: os.Getenv("UPSTASH_REDIS_REST_TOKEN"),
 		QueueURL:       cmp.Or(os.Getenv("VERCEL_QUEUE_URL"), fmt.Sprintf("https://%s.vercel-queue.com/api/v3", cmp.Or(os.Getenv("VERCEL_REGION"), "iad1"))),
@@ -30,6 +31,7 @@ var GetWorld = got.TryUsing(func(c *got.Container) (*vercelworld.World, error) {
 	}
 	if token := os.Getenv("QSTASH_TOKEN"); token != "" {
 		config.QStash = &vercelworld.QStashConfig{
+			BaseURL:           os.Getenv("QSTASH_URL"),
 			Token:             token,
 			CurrentSigningKey: os.Getenv("QSTASH_CURRENT_SIGNING_KEY"),
 			NextSigningKey:    os.Getenv("QSTASH_NEXT_SIGNING_KEY"),
