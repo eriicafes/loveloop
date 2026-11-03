@@ -28,6 +28,15 @@ func (a *App) render(w http.ResponseWriter, status int, page tmpl.Template) erro
 	return a.Templates.Render(w, page)
 }
 
+// stream writes page like render, but sends it before its async values
+// resolve and streams each one in as it does.
+func (a *App) stream(w http.ResponseWriter, r *http.Request, status int, page tmpl.Template) error {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
+	return a.Templates.Stream(r.Context(), w, page)
+}
+
 // redirectWithFlash sends the browser to path, showing flash once there.
 func (a *App) redirectWithFlash(w http.ResponseWriter, r *http.Request, path string, flash pages.Flash) error {
 	if err := a.Flash.Set(w, flash); err != nil {

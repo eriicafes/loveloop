@@ -2,43 +2,56 @@ package web
 
 import (
 	"cmp"
+	"context"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/eriicafes/tmpl"
+
 	"github.com/eriicafes/loveloop/web/templates/pages"
 )
 
-// index serves GET /, the setup page: whether the bot is configured and
+// Index serves GET /, the setup page: whether the bot is configured and
 // connected, with forms to connect or disconnect its webhook.
-func (a *App) index(w http.ResponseWriter, r *http.Request) error {
+func (a *App) Index(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
-	page := pages.Index{PublicURL: publicURL(r), Checks: checks(), Users: -1}
-	page.WebhookURL = page.PublicURL + TelegramWebhookPath
+	page := pages.Index{
+		Checks: checks(),
+		Status: tmpl.Go(func(status tmpl.Async[pages.Status, error]) {
+			status.Ok(a.status(ctx, publicURL(r)))
+		}),
+	}
 	page.Flash, _ = a.Flash.Get(w, r)
+	return a.stream(w, r, http.StatusOK, page)
+}
 
+// status asks Telegram about the bot and its webhook, which can take a
+// moment, so the page streams it in.
+func (a *App) status(ctx context.Context, publicURL string) pages.Status {
+	status := pages.Status{PublicURL: publicURL, WebhookURL: publicURL + TelegramWebhookPath, Users: -1}
 	if os.Getenv("TELEGRAM_BOT_TOKEN") == "" {
-		page.BotError = "TELEGRAM_BOT_TOKEN is not set."
+		status.BotError = "TELEGRAM_BOT_TOKEN is not set."
 	} else if me, err := a.Bot.GetMe(ctx); err != nil {
-		page.BotError = err.Error()
+		status.BotError = err.Error()
 	} else {
-		page.Bot = me
+		status.Bot = me
 		if info, err := a.Bot.GetWebhookInfo(ctx); err != nil {
-			page.BotError = err.Error()
+			status.BotError = err.Error()
 		} else {
-			page.Webhook = info
-			page.Connected = info.URL != "" && info.URL == page.WebhookURL
+			status.Webhook = info
+			status.Connected = info.URL != "" && info.URL == status.WebhookURL
 			if info.LastErrorMessage != "" {
-				page.LastError = info.LastErrorMessage + " (" + time.Unix(info.LastErrorDate, 0).UTC().Format("2 Jan 15:04 UTC") + ")"
+				status.LastError = info.LastErrorMessage + " (" + time.Unix(info.LastErrorDate, 0).UTC().Format("2 Jan 15:04 UTC") + ")"
 			}
 		}
 	}
 	if a.Store != nil {
 		if users, err := a.Store.Users(ctx); err == nil {
-			page.Users = len(users)
+			status.Users = len(users)
 		}
 	}
-	return a.render(w, http.StatusOK, page)
+	return status
 }
 
 // publicURL guesses the URL the bot is deployed at: the production domain

@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/eriicafes/httpx/httperrors"
 	"github.com/eriicafes/tmpl/vite"
 
 	"github.com/eriicafes/loveloop/lib/telegram"
@@ -206,5 +208,20 @@ func TestWebhookRejectsWrongSecret(t *testing.T) {
 	app.Handler().ServeHTTP(res, req)
 	if res.Code != http.StatusUnauthorized {
 		t.Fatalf("status %d", res.Code)
+	}
+}
+
+func TestPageErrorRendersErrorPage(t *testing.T) {
+	app, _ := testApp(t)
+	res := httptest.NewRecorder()
+	app.handlePageError(res, httptest.NewRequest("GET", "/", nil), httperrors.New("no such thing", http.StatusNotFound))
+	if body := res.Body.String(); res.Code != http.StatusNotFound || !strings.Contains(body, "Not Found") || !strings.Contains(body, "no such thing") {
+		t.Fatalf("got %d %q", res.Code, body)
+	}
+
+	res = httptest.NewRecorder()
+	app.handlePageError(res, httptest.NewRequest("GET", "/", nil), errors.New("redis: secret detail"))
+	if body := res.Body.String(); res.Code != http.StatusInternalServerError || strings.Contains(body, "secret detail") || !strings.Contains(body, "Something went wrong") {
+		t.Fatalf("got %d %q", res.Code, body)
 	}
 }

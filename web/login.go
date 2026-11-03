@@ -8,8 +8,8 @@ import (
 	"github.com/eriicafes/loveloop/web/templates/pages"
 )
 
-// loginPage serves GET /login.
-func (a *App) loginPage(w http.ResponseWriter, r *http.Request) error {
+// LoginPage serves GET /login.
+func (a *App) LoginPage(w http.ResponseWriter, r *http.Request) error {
 	if a.signedIn(r) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return nil
@@ -17,9 +17,9 @@ func (a *App) loginPage(w http.ResponseWriter, r *http.Request) error {
 	return a.render(w, http.StatusOK, pages.Login{Configured: a.Password != ""})
 }
 
-// login serves POST /login. A correct password signs the browser in for
+// Login serves POST /login. A correct password signs the browser in for
 // SessionDuration and goes to the setup page.
-func (a *App) login(w http.ResponseWriter, r *http.Request) error {
+func (a *App) Login(w http.ResponseWriter, r *http.Request) error {
 	if a.Password == "" {
 		return a.render(w, http.StatusServiceUnavailable, pages.Login{})
 	}
@@ -35,8 +35,8 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-// requireSession redirects to /login until the browser signs in.
-func (a *App) requireSession(next http.Handler) http.Handler {
+// RequireSessionMiddleware redirects to /login until the browser signs in.
+func (a *App) RequireSessionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !a.signedIn(r) {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)

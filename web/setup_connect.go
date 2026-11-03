@@ -19,9 +19,9 @@ var commands = []telegram.BotCommand{
 	{Command: "reset", Description: "Clear our chat (I keep your people)"},
 }
 
-// setupConnect serves POST /setup/connect. It points Telegram's webhook at
+// SetupConnect serves POST /setup/connect. It points Telegram's webhook at
 // the public URL in the form and sets the bot's command menu.
-func (a *App) setupConnect(w http.ResponseWriter, r *http.Request) error {
+func (a *App) SetupConnect(w http.ResponseWriter, r *http.Request) error {
 	fail := func(message string) error {
 		return a.redirectWithFlash(w, r, "/", pages.Flash{Message: message, Error: true})
 	}

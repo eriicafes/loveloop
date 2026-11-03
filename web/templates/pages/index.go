@@ -9,6 +9,14 @@ import (
 // Index shows whether the bot is configured and connected, with forms to
 // connect or disconnect its webhook.
 type Index struct {
+	// Status streams in once Telegram answers.
+	Status tmpl.Async[Status, error]
+	Checks []Check
+	Flash  Flash
+}
+
+// Status is the bot, its webhook, and what the forms need to act on them.
+type Status struct {
 	Bot        telegram.User
 	BotError   string
 	Webhook    telegram.WebhookInfo
@@ -18,9 +26,7 @@ type Index struct {
 	LastError string
 	PublicURL string
 	// Users is the number of users, or -1 when it is unknown.
-	Users  int
-	Checks []Check
-	Flash  Flash
+	Users int
 }
 
 func (p Index) Tmpl() tmpl.Template {

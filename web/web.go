@@ -110,17 +110,17 @@ var GetApp = got.TryUsing(func(c *got.Container) (*App, error) {
 // Assets from the Vite build are served before the routes.
 func (a *App) Handler() http.Handler {
 	mux := httpx.Fallback(http.NewServeMux(), a.handleError)
-	mux.Route("POST "+TelegramWebhookPath, a.telegram)
+	mux.Route("POST "+TelegramWebhookPath, a.Telegram)
 
-	site := httpx.Use(mux, http.NewCrossOriginProtection().Handler)
-	site.Route("GET /login", a.loginPage)
-	site.Route("POST /login", a.login)
-	site.Route("POST /logout", a.logout)
+	site := httpx.Fallback(httpx.Use(mux, http.NewCrossOriginProtection().Handler), a.handlePageError)
+	site.Route("GET /login", a.LoginPage)
+	site.Route("POST /login", a.Login)
+	site.Route("POST /logout", a.Logout)
 
-	setup := httpx.Use(site, a.requireSession)
-	setup.Route("GET /{$}", a.index)
-	setup.Route("POST /setup/connect", a.setupConnect)
-	setup.Route("POST /setup/disconnect", a.setupDisconnect)
+	setup := httpx.Use(site, a.RequireSessionMiddleware)
+	setup.Route("GET /{$}", a.Index)
+	setup.Route("POST /setup/connect", a.SetupConnect)
+	setup.Route("POST /setup/disconnect", a.SetupDisconnect)
 
 	if a.QStash != nil {
 		mux.Handle("POST /v1/workflow/callbacks/qstash", a.QStash)
@@ -142,4 +142,18 @@ func (a *App) handleError(w http.ResponseWriter, r *http.Request, err error) {
 	}
 	log.Printf("%s %s: %v", r.Method, r.URL.Path, cmp.Or(errors.Unwrap(err), err))
 	http.Error(w, err.Error(), http.StatusInternalServerError)
+}
+
+// handlePageError answers the pages' routes like handleError, but with an
+// error page. Other errors are logged and shown only as a generic message.
+func (a *App) handlePageError(w http.ResponseWriter, r *http.Request, err error) {
+	page := pages.Error{Status: http.StatusInternalServerError, Message: "Something went wrong. Try again in a moment."}
+	if httpErr, ok := httperrors.Unwrap(err); ok {
+		page.Message, page.Status, _ = httperrors.Parse(httpErr)
+	} else {
+		log.Printf("%s %s: %v", r.Method, r.URL.Path, cmp.Or(errors.Unwrap(err), err))
+	}
+	if renderErr := a.render(w, page.Status, page); renderErr != nil {
+		log.Printf("%s %s: render error page: %v", r.Method, r.URL.Path, renderErr)
+	}
 }

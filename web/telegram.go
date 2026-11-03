@@ -27,11 +27,11 @@ const TelegramWebhookPath = "/telegram"
 
 var errNoStore = errors.New("REDIS_URL is not set")
 
-// telegram serves POST /telegram, Telegram's webhook. It answers as soon as
+// Telegram serves POST /telegram, Telegram's webhook. It answers as soon as
 // it has delivered the update to the user's mailbox, since Telegram retries
 // slow webhooks. A failed update answers 500, so Telegram redelivers it, and
 // redeliveries of handled updates are deduplicated.
-func (a *App) telegram(w http.ResponseWriter, r *http.Request) error {
+func (a *App) Telegram(w http.ResponseWriter, r *http.Request) error {
 	if a.WebhookSecret == "" || subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Telegram-Bot-Api-Secret-Token")), []byte(a.WebhookSecret)) != 1 {
 		return httperrors.New("unauthorized", http.StatusUnauthorized)
 	}
