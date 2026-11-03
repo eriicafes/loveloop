@@ -102,7 +102,10 @@ page afterwards.
 2. Set the environment variables from `.env.example`: `TELEGRAM_BOT_TOKEN`,
    `TELEGRAM_WEBHOOK_SECRET`, `SETUP_PASSWORD`, `TOOL_APPROVAL_SECRET`, and
    optionally `TELEGRAM_ALLOWED_USERS` and `MODEL`. The AI Gateway uses the
-   deployment's OIDC token, so no model key is needed.
+   deployment's OIDC token, so no model key is needed. For the Workflow SDK
+   web UI at `/_workflow`, also set `WORKFLOW_HTTP_TOKEN`,
+   `WORKFLOW_TARGET_WORLD=go-workflow/world-http`, and
+   `WORKFLOW_HTTP_BASE_URL` to your production domain plus `/v1/workflow`.
 3. Deploy, open the deployment's URL, sign in with `SETUP_PASSWORD`, and
    press **Connect bot**. The page shows whether
    Telegram is delivering to the deployment, the last delivery error, and
