@@ -108,19 +108,3 @@ func (a *App) EnsureCheckIns(ctx context.Context, chatID int64) error {
 	}
 	return a.Store.SetCheckInsRun(ctx, chatID, run.ID())
 }
-
-// EnsureAllCheckIns runs EnsureCheckIns for every user.
-func (a *App) EnsureAllCheckIns(ctx context.Context) error {
-	if a.Store == nil {
-		return errNoStore
-	}
-	users, err := a.Store.Users(ctx)
-	if err != nil {
-		return err
-	}
-	var errs []error
-	for _, chatID := range users {
-		errs = append(errs, a.EnsureCheckIns(ctx, chatID))
-	}
-	return errors.Join(errs...)
-}

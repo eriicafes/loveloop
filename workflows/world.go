@@ -15,16 +15,15 @@ import (
 const DefaultTopic = "loveloop-workflow"
 
 // GetWorld returns the Vercel World configured from the environment. It
-// reaches Redis over the Upstash REST API with the credentials the Upstash
-// integration sets on Vercel. Clients are built from it with
-// workflow.NewClient.
+// shares REDIS_URL with the store, over TCP: Vercel keeps Go function
+// instances warm, so the connection pool outlives a request. Clients are
+// built from it with workflow.NewClient.
 var GetWorld = got.TryUsing(func(c *got.Container) (*vercelworld.World, error) {
 	config := vercelworld.Config{
-		BaseURL:        os.Getenv("WORKFLOW_BASE_URL"),
-		RedisRESTURL:   os.Getenv("UPSTASH_REDIS_REST_URL"),
-		RedisRESTToken: os.Getenv("UPSTASH_REDIS_REST_TOKEN"),
-		QueueURL:       cmp.Or(os.Getenv("VERCEL_QUEUE_URL"), fmt.Sprintf("https://%s.vercel-queue.com/api/v3", cmp.Or(os.Getenv("VERCEL_REGION"), "iad1"))),
-		Topic:          cmp.Or(os.Getenv("VERCEL_WORKFLOW_QUEUE_TOPIC"), DefaultTopic),
+		BaseURL:  os.Getenv("WORKFLOW_BASE_URL"),
+		RedisURL: os.Getenv("REDIS_URL"),
+		QueueURL: cmp.Or(os.Getenv("VERCEL_QUEUE_URL"), fmt.Sprintf("https://%s.vercel-queue.com/api/v3", cmp.Or(os.Getenv("VERCEL_REGION"), "iad1"))),
+		Topic:    cmp.Or(os.Getenv("VERCEL_WORKFLOW_QUEUE_TOPIC"), DefaultTopic),
 	}
 	if config.BaseURL == "" && os.Getenv("VERCEL_PROJECT_PRODUCTION_URL") != "" {
 		config.BaseURL = "https://" + os.Getenv("VERCEL_PROJECT_PRODUCTION_URL") + "/v1/workflow"

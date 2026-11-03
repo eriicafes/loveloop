@@ -57,8 +57,8 @@ web/          App: httpx routes, one file per path (index.go, login.go, telegram
 web/templates tmpl pages (struct beside its html) and autoloaded ui components
 web/src       Tailwind entry; Vite (package.json and vite.config.ts at the root) builds it into web/dist, which web embeds
 workflows/    Workflow types and the World; flows/ holds Flows: the runners, agent, and tools
-store/        Redis storage
-telegram/     Bot API client
+lib/store     Redis storage
+lib/telegram  Bot API client
 cmd/local     Run everything locally with long polling and a local World
 cmd/dev       Run cmd/local -dev and the Vite dev server with live reload (go-dev)
 ```
@@ -88,8 +88,7 @@ page afterwards.
 ## Deploy to Vercel
 
 1. Create the project, add the Upstash Redis integration, and enable Vercel
-   Queues. LoveLoop's data uses `REDIS_URL`, and the workflow World uses
-   `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
+   Queues. LoveLoop's data and the workflow World share its `REDIS_URL`.
 2. Set the environment variables from `.env.example`: `TELEGRAM_BOT_TOKEN`,
    `TELEGRAM_WEBHOOK_SECRET`, `SETUP_PASSWORD`, `TOOL_APPROVAL_SECRET`, and
    optionally `TELEGRAM_ALLOWED_USERS` and `MODEL`. The AI Gateway uses the

@@ -19,7 +19,7 @@ func main() {
 		Run:     dev.Package("./cmd/local"),
 		Prepare: dev.Hooks(workflowdev.Check()),
 		Args:    dev.Values("-dev"),
-		Watch:   dev.Values("go.mod", "go.sum", "cmd/local", "store", "telegram", "web", "workflows"),
+		Watch:   dev.Values("go.mod", "go.sum", "cmd/local", "lib", "web", "workflows"),
 		// go-dev always skips .git and node_modules. Vite serves web/src and
 		// writes web/dist itself.
 		WatchExclude: dev.Values("web/dist", "web/src"),

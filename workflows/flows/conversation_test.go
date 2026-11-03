@@ -20,8 +20,8 @@ import (
 	"github.com/eriicafes/got"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/eriicafes/loveloop/store"
-	"github.com/eriicafes/loveloop/telegram"
+	"github.com/eriicafes/loveloop/lib/store"
+	"github.com/eriicafes/loveloop/lib/telegram"
 	"github.com/eriicafes/loveloop/workflows"
 )
 

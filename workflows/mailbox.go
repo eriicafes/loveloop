@@ -7,7 +7,7 @@ import (
 
 	"github.com/eriicafes/go-workflow"
 
-	"github.com/eriicafes/loveloop/store"
+	"github.com/eriicafes/loveloop/lib/store"
 )
 
 // MailboxToken is the token of the hook that wakes a user's Conversation

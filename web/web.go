@@ -22,8 +22,8 @@ import (
 	"github.com/eriicafes/tmpl"
 	"github.com/eriicafes/tmpl/vite"
 
-	"github.com/eriicafes/loveloop/store"
-	"github.com/eriicafes/loveloop/telegram"
+	"github.com/eriicafes/loveloop/lib/store"
+	"github.com/eriicafes/loveloop/lib/telegram"
 	"github.com/eriicafes/loveloop/web/templates"
 	"github.com/eriicafes/loveloop/web/templates/pages"
 )
@@ -110,7 +110,7 @@ var GetApp = got.TryUsing(func(c *got.Container) (*App, error) {
 // Assets from the Vite build are served before the routes.
 func (a *App) Handler() http.Handler {
 	mux := httpx.Fallback(http.NewServeMux(), a.handleError)
-	mux.Route("POST "+WebhookPath, a.telegram)
+	mux.Route("POST "+TelegramWebhookPath, a.telegram)
 
 	site := httpx.Use(mux, http.NewCrossOriginProtection().Handler)
 	site.Route("GET /login", a.loginPage)

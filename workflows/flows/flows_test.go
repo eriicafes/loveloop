@@ -8,7 +8,7 @@ import (
 	"github.com/eriicafes/go-workflow/workflowai"
 	"github.com/eriicafes/got"
 
-	"github.com/eriicafes/loveloop/store"
+	"github.com/eriicafes/loveloop/lib/store"
 )
 
 func TestDropPendingApprovals(t *testing.T) {

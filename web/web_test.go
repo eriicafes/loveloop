@@ -12,7 +12,7 @@ import (
 
 	"github.com/eriicafes/tmpl/vite"
 
-	"github.com/eriicafes/loveloop/telegram"
+	"github.com/eriicafes/loveloop/lib/telegram"
 	"github.com/eriicafes/loveloop/web/templates"
 )
 
@@ -200,7 +200,7 @@ func TestServesBuiltAssets(t *testing.T) {
 
 func TestWebhookRejectsWrongSecret(t *testing.T) {
 	app, _ := testApp(t)
-	req := httptest.NewRequest("POST", WebhookPath, strings.NewReader(`{"update_id":1}`))
+	req := httptest.NewRequest("POST", TelegramWebhookPath, strings.NewReader(`{"update_id":1}`))
 	req.Header.Set("X-Telegram-Bot-Api-Secret-Token", "wrong")
 	res := httptest.NewRecorder()
 	app.Handler().ServeHTTP(res, req)

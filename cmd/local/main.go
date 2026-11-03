@@ -33,6 +33,7 @@ import (
 )
 
 func main() {
+	port := cmp.Or(os.Getenv("PORT"), "8100")
 	dev := flag.Bool("dev", false, "load assets from the Vite dev server")
 	flag.Parse()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -43,7 +44,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	port := cmp.Or(os.Getenv("PORT"), "8100")
+
 	world, err := localworld.Open(localworld.Config{
 		Dir:     ".workflows",
 		BaseURL: "http://localhost:" + port + "/v1/workflow",
@@ -52,6 +53,9 @@ func main() {
 		log.Fatal(err)
 	}
 	defer world.Close()
+	if err := prepare(ctx, world); err != nil {
+		log.Fatal(err)
+	}
 
 	if *dev {
 		v, err := vite.New(vite.Config{Dev: true})
@@ -59,9 +63,6 @@ func main() {
 			log.Fatal(err)
 		}
 		got.Mock2(c, web.GetVite, v, nil)
-	}
-	if err := prepare(ctx, world); err != nil {
-		log.Fatal(err)
 	}
 
 	app, err := web.GetApp.From(c)
@@ -73,8 +74,16 @@ func main() {
 	app.Client = workflow.NewClient(world)
 	app.Workflow = localworld.HTTP(world)
 
-	if err := app.EnsureAllCheckIns(ctx); err != nil {
-		log.Printf("check-ins: %v", err)
+	// Restart the check-in chains a new or wiped .workflows lost. app.Store is
+	// not nil here: building the runners above already required the store.
+	users, err := app.Store.Users(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, chatID := range users {
+		if err := app.EnsureCheckIns(ctx, chatID); err != nil {
+			log.Printf("check-ins for %d: %v", chatID, err)
+		}
 	}
 	if err := app.Bot.DeleteWebhook(ctx); err != nil {
 		log.Fatal(err)

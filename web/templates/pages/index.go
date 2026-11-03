@@ -3,7 +3,7 @@ package pages
 import (
 	"github.com/eriicafes/tmpl"
 
-	"github.com/eriicafes/loveloop/telegram"
+	"github.com/eriicafes/loveloop/lib/telegram"
 )
 
 // Index shows whether the bot is configured and connected, with forms to

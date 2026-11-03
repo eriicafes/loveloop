@@ -10,8 +10,8 @@ import (
 	"github.com/eriicafes/go-workflow/worlds"
 	"github.com/eriicafes/got"
 
-	"github.com/eriicafes/loveloop/store"
-	"github.com/eriicafes/loveloop/telegram"
+	"github.com/eriicafes/loveloop/lib/store"
+	"github.com/eriicafes/loveloop/lib/telegram"
 )
 
 // Flows runs LoveLoop's workflows. Its methods are the runners and the

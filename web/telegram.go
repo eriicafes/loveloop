@@ -17,13 +17,13 @@ import (
 	"github.com/eriicafes/httpx"
 	"github.com/eriicafes/httpx/httperrors"
 
-	"github.com/eriicafes/loveloop/store"
-	"github.com/eriicafes/loveloop/telegram"
+	"github.com/eriicafes/loveloop/lib/store"
+	"github.com/eriicafes/loveloop/lib/telegram"
 	"github.com/eriicafes/loveloop/workflows"
 )
 
-// WebhookPath is the path Telegram delivers updates to.
-const WebhookPath = "/telegram"
+// TelegramWebhookPath is the path Telegram delivers updates to.
+const TelegramWebhookPath = "/telegram"
 
 var errNoStore = errors.New("REDIS_URL is not set")
 

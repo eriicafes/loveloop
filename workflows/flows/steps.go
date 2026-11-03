@@ -12,8 +12,8 @@ import (
 	"github.com/eriicafes/go-workflow"
 	"github.com/eriicafes/go-workflow/workflowai"
 
-	"github.com/eriicafes/loveloop/store"
-	"github.com/eriicafes/loveloop/telegram"
+	"github.com/eriicafes/loveloop/lib/store"
+	"github.com/eriicafes/loveloop/lib/telegram"
 )
 
 // state is everything the agent knows about a user at the start of a turn.

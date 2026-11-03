@@ -8,7 +8,7 @@ import (
 
 	"github.com/eriicafes/go-workflow"
 
-	"github.com/eriicafes/loveloop/store"
+	"github.com/eriicafes/loveloop/lib/store"
 	"github.com/eriicafes/loveloop/workflows"
 )
 
