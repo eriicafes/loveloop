@@ -1,3 +1,7 @@
+# Vercel rejects functions whose included files are symlinks, and
+# api/workflow-web.ts includes packages from node_modules, so install them as
+# real directories.
+nodeLinker: hoisted
 allowBuilds:
   cbor-extract: false
 minimumReleaseAgeExclude:
