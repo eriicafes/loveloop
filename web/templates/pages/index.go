@@ -6,12 +6,13 @@ import (
 	"github.com/eriicafes/loveloop/lib/telegram"
 )
 
-// Index shows whether the bot is configured and connected, with forms to
-// connect or disconnect its webhook.
+// Index shows whether the bot is connected, with forms to connect or
+// disconnect its webhook, and the people LoveLoop remembers for each user.
 type Index struct {
 	// Status streams in once Telegram answers.
 	Status tmpl.Async[Status, error]
-	Checks []Check
+	// People streams in once Redis answers.
+	People tmpl.Async[[]UserPeople, error]
 	Flash  Flash
 }
 
@@ -33,12 +34,19 @@ func (p Index) Tmpl() tmpl.Template {
 	return tmpl.Wrap(Layout{Title: "LoveLoop setup"}, tmpl.Tmpl("pages/index", p))
 }
 
-// Check is one piece of configuration and whether it is set.
-type Check struct {
-	Name     string
-	Detail   string
-	OK       bool
-	Optional bool
+// UserPeople is a user and the loved ones LoveLoop remembers for them.
+type UserPeople struct {
+	Name   string
+	People []Person
+}
+
+// Person is one loved one, described for the page.
+type Person struct {
+	Name         string
+	Relationship string
+	// LastContact says when the user last got in touch, such as "3 days
+	// ago", or is empty when they never told LoveLoop.
+	LastContact string
 }
 
 // Flash is a message shown once after a form posts.

@@ -1,26 +1,24 @@
-{{/* ui/card and its parts take props: children, class. */}}
+{{/*
+  ui/card props:
+    title         optional header title
+    description   optional header description, under the title
+    children      optional body: string or template
+    footer        optional footer, below a border: string or template
+    class
+*/}}
 {{ define "ui/card" }}
 <section class="{{ clsx "rounded-xl border bg-card text-card-foreground shadow-sm" .class }}">
-  {{ render .children }}
+  {{ with .title }}
+  <div class="flex flex-col gap-1.5 p-6 pb-4">
+    <h2 class="text-base font-semibold leading-none tracking-tight">{{ . }}</h2>
+    {{ with $.description }}<p class="text-sm text-muted-foreground">{{ . }}</p>{{ end }}
+  </div>
+  {{ end }}
+  {{ with .children }}
+  <div class="{{ clsx "px-6 pb-6" (not $.title) "pt-6" }}">{{ render . }}</div>
+  {{ end }}
+  {{ with .footer }}
+  <div class="flex items-center gap-2 border-t px-6 py-4">{{ render . }}</div>
+  {{ end }}
 </section>
-{{ end }}
-
-{{ define "ui/card-header" }}
-<div class="{{ clsx "flex flex-col gap-1.5 p-6 pb-4" .class }}">{{ render .children }}</div>
-{{ end }}
-
-{{ define "ui/card-title" }}
-<h2 class="{{ clsx "text-base font-semibold leading-none tracking-tight" .class }}">{{ render .children }}</h2>
-{{ end }}
-
-{{ define "ui/card-description" }}
-<p class="{{ clsx "text-sm text-muted-foreground" .class }}">{{ render .children }}</p>
-{{ end }}
-
-{{ define "ui/card-content" }}
-<div class="{{ clsx "px-6 pb-6" .class }}">{{ render .children }}</div>
-{{ end }}
-
-{{ define "ui/card-footer" }}
-<div class="{{ clsx "flex items-center gap-2 border-t px-6 py-4" .class }}">{{ render .children }}</div>
 {{ end }}

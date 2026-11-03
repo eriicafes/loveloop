@@ -1,37 +1,12 @@
-{{ define "webhook-card" }}
-{{ template "ui/card-header" props "class" "flex-row items-center justify-between gap-3" "children" (tmpl "webhook-header" .) }}
-{{ template "ui/card-content" props "children" (tmpl "webhook-details" .) }}
-{{ end }}
-
-{{ define "webhook-card:pending" }}
-{{ template "ui/card-header" props "children" (tmpl "webhook-pending" .) }}
-{{ end }}
-
-{{ define "webhook-card:error" }}
-{{ template "ui/card-header" props "children" (tmpl "webhook-error" .) }}
-{{ end }}
-
-{{ define "webhook-header" }}
-<div class="flex flex-col gap-1.5">
-  {{ template "ui/card-title" props "children" "Webhook" }}
-  {{ template "ui/card-description" props "children" "Where Telegram delivers your bot's messages." }}
-</div>
+{{ define "webhook-card-content" }}
 {{ if .BotError }}
-{{ template "ui/badge" props "variant" "destructive" "children" "Bot unreachable" }}
-{{ else if .Connected }}
-{{ template "ui/badge" props "variant" "success" "children" "● Connected" }}
-{{ else if .Webhook.URL }}
-{{ template "ui/badge" props "variant" "warning" "children" "● Points elsewhere" }}
-{{ else }}
-{{ template "ui/badge" props "variant" "warning" "children" "○ Not connected" }}
-{{ end }}
-{{ end }}
-
-{{ define "webhook-details" }}
-{{ if .BotError }}
-<p class="text-sm text-muted-foreground wrap-break-word">{{ .BotError }}</p>
+<p class="wrap-break-word text-sm text-destructive">Bot unreachable: {{ .BotError }}</p>
 {{ else }}
 <dl class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2.5 text-sm">
+  <dt class="text-muted-foreground">Status</dt>
+  <dd class="font-medium {{ if .Connected }}text-success{{ else }}text-warning{{ end }}">
+    {{ if .Connected }}● Connected{{ else if .Webhook.URL }}● Points elsewhere{{ else }}○ Not connected{{ end }}
+  </dd>
   <dt class="text-muted-foreground">Delivering to</dt>
   <dd class="min-w-0 break-all">
     {{ with .Webhook.URL }}<code class="font-mono text-[13px]">{{ . }}</code>{{ else }}<span class="text-muted-foreground">nowhere</span>{{ end }}
@@ -48,12 +23,10 @@
 {{ end }}
 {{ end }}
 
-{{ define "webhook-pending" }}
-{{ template "ui/card-title" props "children" "Webhook" }}
-{{ template "ui/card-description" props "children" "Asking Telegram where it delivers…" }}
+{{ define "webhook-card-content:pending" }}
+<p class="text-sm text-muted-foreground">Asking Telegram where it delivers…</p>
 {{ end }}
 
-{{ define "webhook-error" }}
-{{ template "ui/card-title" props "children" "Webhook" }}
+{{ define "webhook-card-content:error" }}
 <p class="wrap-break-word text-sm text-destructive">{{ . }}</p>
 {{ end }}

@@ -1,0 +1,35 @@
+{{ define "people-card-content" }}
+{{ if . }}
+<div class="flex flex-col gap-5">
+  {{ range . }}
+  <div>
+    <h3 class="text-sm font-medium">{{ .Name }}</h3>
+    {{ if .People }}
+    <ul class="mt-1 divide-y">
+      {{ range .People }}
+      <li class="flex items-baseline justify-between gap-3 py-2 text-sm">
+        <span class="min-w-0 truncate">
+          {{ .Name }}{{ with .Relationship }} <span class="text-muted-foreground">· {{ . }}</span>{{ end }}
+        </span>
+        {{ with .LastContact }}<span class="shrink-0 text-xs text-muted-foreground">{{ . }}</span>{{ end }}
+      </li>
+      {{ end }}
+    </ul>
+    {{ else }}
+    <p class="mt-1 text-sm text-muted-foreground">No one yet.</p>
+    {{ end }}
+  </div>
+  {{ end }}
+</div>
+{{ else }}
+<p class="text-sm text-muted-foreground">No one has chatted with the bot yet. Loved ones appear here as users mention them.</p>
+{{ end }}
+{{ end }}
+
+{{ define "people-card-content:pending" }}
+<p class="text-sm text-muted-foreground">Loading people…</p>
+{{ end }}
+
+{{ define "people-card-content:error" }}
+<p class="wrap-break-word text-sm text-destructive">{{ . }}</p>
+{{ end }}

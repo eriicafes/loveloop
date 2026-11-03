@@ -3,8 +3,11 @@ package web
 import (
 	"cmp"
 	"context"
+	"fmt"
 	"net/http"
 	"os"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/eriicafes/tmpl"
@@ -12,14 +15,20 @@ import (
 	"github.com/eriicafes/loveloop/web/templates/pages"
 )
 
-// Index serves GET /, the setup page: whether the bot is configured and
-// connected, with forms to connect or disconnect its webhook.
+// Index serves GET /, the setup page: whether the bot is connected, with
+// forms to connect or disconnect its webhook, and each user's people.
 func (a *App) Index(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 	page := pages.Index{
-		Checks: checks(),
 		Status: tmpl.Go(func(status tmpl.Async[pages.Status, error]) {
 			status.Ok(a.status(ctx, publicURL(r)))
+		}),
+		People: tmpl.Go(func(people tmpl.Async[[]pages.UserPeople, error]) {
+			if found, err := a.people(ctx, time.Now()); err != nil {
+				people.Err(err)
+			} else {
+				people.Ok(found)
+			}
 		}),
 	}
 	page.Flash, _ = a.Flash.Get(w, r)
@@ -54,6 +63,57 @@ func (a *App) status(ctx context.Context, publicURL string) pages.Status {
 	return status
 }
 
+// people returns every user, by name, with the loved ones LoveLoop
+// remembers for them.
+func (a *App) people(ctx context.Context, now time.Time) ([]pages.UserPeople, error) {
+	if a.Store == nil {
+		return nil, errNoStore
+	}
+	ids, err := a.Store.Users(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]pages.UserPeople, 0, len(ids))
+	for _, id := range ids {
+		user, err := a.Store.User(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		people, err := a.Store.People(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		entry := pages.UserPeople{Name: cmp.Or(user.Name, fmt.Sprintf("Chat %d", id))}
+		for _, person := range people {
+			entry.People = append(entry.People, pages.Person{
+				Name:         person.Name,
+				Relationship: person.Relationship,
+				LastContact:  lastContact(person.LastContactAt, now),
+			})
+		}
+		result = append(result, entry)
+	}
+	slices.SortFunc(result, func(a, b pages.UserPeople) int {
+		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+	})
+	return result, nil
+}
+
+// lastContact describes when at was, relative to now, in days.
+func lastContact(at, now time.Time) string {
+	if at.IsZero() {
+		return ""
+	}
+	switch days := int(now.Sub(at).Hours() / 24); days {
+	case 0:
+		return "today"
+	case 1:
+		return "yesterday"
+	default:
+		return fmt.Sprintf("%d days ago", days)
+	}
+}
+
 // publicURL guesses the URL the bot is deployed at: the production domain
 // on Vercel, and otherwise the URL of this request.
 func publicURL(r *http.Request) string {
@@ -65,17 +125,4 @@ func publicURL(r *http.Request) string {
 		scheme = "https"
 	}
 	return cmp.Or(r.Header.Get("X-Forwarded-Proto"), scheme) + "://" + r.Host
-}
-
-func checks() []pages.Check {
-	set := func(name string) bool { return os.Getenv(name) != "" }
-	return []pages.Check{
-		{Name: "Bot token", Detail: "TELEGRAM_BOT_TOKEN", OK: set("TELEGRAM_BOT_TOKEN")},
-		{Name: "Webhook secret", Detail: "TELEGRAM_WEBHOOK_SECRET", OK: set("TELEGRAM_WEBHOOK_SECRET")},
-		{Name: "Redis", Detail: "REDIS_URL", OK: set("REDIS_URL")},
-		{Name: "Model", Detail: "AI Gateway via AI_GATEWAY_API_KEY or Vercel OIDC", OK: set("AI_GATEWAY_API_KEY") || set("VERCEL_OIDC_TOKEN")},
-		{Name: "Approval signing", Detail: "TOOL_APPROVAL_SECRET", OK: set("TOOL_APPROVAL_SECRET"), Optional: true},
-		{Name: "Workflow RPC", Detail: "WORKFLOW_HTTP_TOKEN, for the Workflow SDK web UI", OK: set("WORKFLOW_HTTP_TOKEN"), Optional: true},
-		{Name: "Allowed users", Detail: cmp.Or(os.Getenv("TELEGRAM_ALLOWED_USERS"), "Anyone can chat"), OK: set("TELEGRAM_ALLOWED_USERS"), Optional: true},
-	}
 }

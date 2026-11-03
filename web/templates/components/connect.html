@@ -1,22 +1,21 @@
 {{ define "connect-card" }}
-{{ template "ui/card-header" props "children" (tmpl "connect-header" .) }}
-{{ template "ui/card-content" props "children" (tmpl "connect-form" .) }}
-{{ if .Webhook.URL }}
-{{ template "ui/card-footer" props "class" "justify-between" "children" (tmpl "disconnect-form" .) }}
-{{ end }}
+{{ template "ui/card" props
+  "title" "Connect" "description" "Point Telegram at this deployment and set the bot's command menu."
+  "children" (tmpl "connect-form" .)
+  "footer" (and .Webhook.URL (tmpl "disconnect-form" .))
+}}
 {{ end }}
 
 {{ define "connect-card:pending" }}
-{{ template "ui/card-header" props "children" (tmpl "connect-header" .) }}
+{{ template "ui/card" props "title" "Connect" "description" "Point Telegram at this deployment and set the bot's command menu." }}
 {{ end }}
 
 {{ define "connect-card:error" }}
-{{ template "ui/card-header" props "children" (tmpl "connect-error" .) }}
+{{ template "ui/card" props "title" "Connect" "children" (tmpl "connect-error" .) }}
 {{ end }}
 
-{{ define "connect-header" }}
-{{ template "ui/card-title" props "children" "Connect" }}
-{{ template "ui/card-description" props "children" "Point Telegram at this deployment and set the bot's command menu." }}
+{{ define "connect-error" }}
+<p class="text-sm text-destructive">Reload the page to try again.</p>
 {{ end }}
 
 {{ define "connect-form" }}
@@ -36,13 +35,10 @@
 {{ end }}
 
 {{ define "disconnect-form" }}
-<p class="min-w-0 text-xs text-muted-foreground">Stops delivery until you connect again.</p>
-<form method="post" action="/setup/disconnect" onsubmit="return confirm('Stop delivering messages to {{ .Webhook.URL }}?')">
-  {{ template "ui/button" props "type" "submit" "variant" "outline-destructive" "size" "sm" "children" "Disconnect" }}
-</form>
-{{ end }}
-
-{{ define "connect-error" }}
-{{ template "ui/card-title" props "children" "Connect" }}
-<p class="wrap-break-word text-sm text-destructive">Reload the page to try again.</p>
+<div class="flex flex-1 items-center justify-between gap-2">
+  <p class="min-w-0 text-xs text-muted-foreground">Stops delivery until you connect again.</p>
+  <form method="post" action="/setup/disconnect" onsubmit="return confirm('Stop delivering messages to {{ .Webhook.URL }}?')">
+    {{ template "ui/button" props "type" "submit" "variant" "outline-destructive" "size" "sm" "children" "Disconnect" }}
+  </form>
+</div>
 {{ end }}
