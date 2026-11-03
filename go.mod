@@ -8,7 +8,7 @@ require (
 	github.com/eriicafes/go-workflow v0.6.0
 	github.com/eriicafes/got v0.5.0
 	github.com/eriicafes/httpx v0.5.1
-	github.com/eriicafes/tmpl v0.15.1
+	github.com/eriicafes/tmpl v0.16.0
 	github.com/redis/go-redis/v9 v9.7.3
 )
 

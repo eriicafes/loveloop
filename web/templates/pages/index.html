@@ -15,11 +15,7 @@
   {{ template "ui/alert" props "variant" (or (and $.Flash.Error "destructive") "success") "children" . }}
   {{ end }}
 
-  {{ template "ui/card" props "children" (tmpl "webhook-stream" .Status) }}
-  {{ template "ui/card" props "children" (tmpl "connect-stream" .Status) }}
+  {{ template "ui/card" props "children" (streamtmpl "webhook-card" .Status) }}
+  {{ template "ui/card" props "children" (streamtmpl "connect-card" .Status) }}
   {{ template "ui/card" props "children" (tmpl "config-card" .Checks) }}
 </main>
-
-{{ define "webhook-stream" }}{{ stream "webhook-card" . }}{{ end }}
-
-{{ define "connect-stream" }}{{ stream "connect-card" . }}{{ end }}
