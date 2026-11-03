@@ -12,5 +12,9 @@
     "@types/node": "^26.6.6",
     "tailwindcss": "^4.1.0",
     "vite": "^8.0.0"
+  },
+  "dependencies": {
+    "@workflow/web": "5.0.7",
+    "go-workflow": "0.6.0"
   }
 }

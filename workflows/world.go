@@ -20,21 +20,12 @@ const DefaultTopic = "loveloop-workflow"
 // built from it with workflow.NewClient.
 var GetWorld = got.TryUsing(func(c *got.Container) (*vercelworld.World, error) {
 	config := vercelworld.Config{
-		BaseURL:  os.Getenv("WORKFLOW_BASE_URL"),
 		RedisURL: os.Getenv("REDIS_URL"),
-		QueueURL: cmp.Or(os.Getenv("VERCEL_QUEUE_URL"), fmt.Sprintf("https://%s.vercel-queue.com/api/v3", cmp.Or(os.Getenv("VERCEL_REGION"), "iad1"))),
-		Topic:    cmp.Or(os.Getenv("VERCEL_WORKFLOW_QUEUE_TOPIC"), DefaultTopic),
+		QueueURL: fmt.Sprintf("https://%s.vercel-queue.com/api/v3", cmp.Or(os.Getenv("VERCEL_REGION"), "iad1")),
+		Topic:    DefaultTopic,
 	}
-	if config.BaseURL == "" && os.Getenv("VERCEL_PROJECT_PRODUCTION_URL") != "" {
+	if os.Getenv("VERCEL_PROJECT_PRODUCTION_URL") != "" {
 		config.BaseURL = "https://" + os.Getenv("VERCEL_PROJECT_PRODUCTION_URL") + "/v1/workflow"
-	}
-	if token := os.Getenv("QSTASH_TOKEN"); token != "" {
-		config.QStash = &vercelworld.QStashConfig{
-			BaseURL:           os.Getenv("QSTASH_URL"),
-			Token:             token,
-			CurrentSigningKey: os.Getenv("QSTASH_CURRENT_SIGNING_KEY"),
-			NextSigningKey:    os.Getenv("QSTASH_NEXT_SIGNING_KEY"),
-		}
 	}
 	return vercelworld.New(config)
 })

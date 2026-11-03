@@ -1,0 +1,48 @@
+{{ define "connect-card" }}
+{{ template "ui/card-header" props "children" (tmpl "connect-header" .) }}
+{{ template "ui/card-content" props "children" (tmpl "connect-form" .) }}
+{{ if .Webhook.URL }}
+{{ template "ui/card-footer" props "class" "justify-between" "children" (tmpl "disconnect-form" .) }}
+{{ end }}
+{{ end }}
+
+{{ define "connect-card:pending" }}
+{{ template "ui/card-header" props "children" (tmpl "connect-header" .) }}
+{{ end }}
+
+{{ define "connect-card:error" }}
+{{ template "ui/card-header" props "children" (tmpl "connect-error" .) }}
+{{ end }}
+
+{{ define "connect-header" }}
+{{ template "ui/card-title" props "children" "Connect" }}
+{{ template "ui/card-description" props "children" "Point Telegram at this deployment and set the bot's command menu." }}
+{{ end }}
+
+{{ define "connect-form" }}
+<form method="post" action="/setup/connect" class="flex flex-col gap-3">
+  {{ template "ui/label" props "for" "public_url" "children" "Public URL" }}
+  <div class="flex flex-col gap-2 sm:flex-row">
+    {{ template "ui/input" props
+      "id" "public_url" "name" "public_url" "type" "url" "required" true
+      "value" .PublicURL "placeholder" "https://loveloop.vercel.app"
+    }}
+    {{ template "ui/button" props "type" "submit" "class" "shrink-0" "children" (or (and .Connected "Reconnect") "Connect bot") }}
+  </div>
+  <p class="text-xs text-muted-foreground">
+    Telegram delivers updates to <code class="font-mono">&lt;URL&gt;/telegram</code> with your webhook secret.
+  </p>
+</form>
+{{ end }}
+
+{{ define "disconnect-form" }}
+<p class="min-w-0 text-xs text-muted-foreground">Stops delivery until you connect again.</p>
+<form method="post" action="/setup/disconnect" onsubmit="return confirm('Stop delivering messages to {{ .Webhook.URL }}?')">
+  {{ template "ui/button" props "type" "submit" "variant" "outline-destructive" "size" "sm" "children" "Disconnect" }}
+</form>
+{{ end }}
+
+{{ define "connect-error" }}
+{{ template "ui/card-title" props "children" "Connect" }}
+<p class="wrap-break-word text-sm text-destructive">Reload the page to try again.</p>
+{{ end }}

@@ -1,0 +1,18 @@
+{{ define "bot-name" }}
+{{ if .Bot.Username }}
+<p class="truncate text-sm text-muted-foreground">
+  {{ .Bot.FirstName }} ·
+  <a class="font-medium text-primary hover:underline" href="https://t.me/{{ .Bot.Username }}" target="_blank" rel="noopener">@{{ .Bot.Username }}</a>
+</p>
+{{ else }}
+<p class="text-sm text-muted-foreground">Connect your Telegram bot to this deployment.</p>
+{{ end }}
+{{ end }}
+
+{{ define "bot-name:pending" }}
+<p class="text-sm text-muted-foreground">Checking your bot…</p>
+{{ end }}
+
+{{ define "bot-name:error" }}
+<p class="text-sm text-destructive">Couldn't check your bot.</p>
+{{ end }}

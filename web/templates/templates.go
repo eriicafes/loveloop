@@ -1,6 +1,8 @@
-// Package templates holds LoveLoop's page templates and ui components. Each
-// page's struct sits beside its html file in pages, and the components in
-// components/ui are autoloaded into every page.
+// Package templates holds LoveLoop's page templates and components. Each
+// page's struct sits beside its html file in pages. Everything in components
+// is autoloaded into every page: the shadcn-style ui kit in components/ui and
+// container components, such as the setup page's cards, beside it. Pages
+// lay them out and wire them together.
 package templates
 
 import (

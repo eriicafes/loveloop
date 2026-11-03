@@ -1,7 +1,8 @@
 // local runs LoveLoop on this machine: workflows run in process on a local
 // World in .workflows, updates come from long polling instead of a webhook,
 // and check-in chains are restarted at startup. It needs REDIS_URL,
-// TELEGRAM_BOT_TOKEN, and AI_GATEWAY_API_KEY or ANTHROPIC_API_KEY.
+// TELEGRAM_BOT_TOKEN, and AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN from vercel
+// env pull.
 //
 // With -dev, pages load their assets from the Vite dev server (`pnpm dev`
 // in web); cmd/dev starts both. Without it, they use the embedded build of
@@ -70,7 +71,8 @@ func main() {
 		log.Fatal(err)
 	}
 	// Runs are recorded in the local World instead of the Vercel World, and
-	// the Workflow SDK web UI can inspect them through /v1/workflow.
+	// the Workflow SDK web UI can inspect them through /v1/workflow. Its RPC
+	// endpoint is open because the server listens only on localhost.
 	app.Client = workflow.NewClient(world)
 	app.Workflow = localworld.HTTP(world)
 

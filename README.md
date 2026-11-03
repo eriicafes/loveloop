@@ -32,7 +32,7 @@ the agent is replying or summarizing waits its turn and is answered with
 that context, and mail that arrives as a run ends is picked up by the next.
 
 No wait in any workflow is longer than six days, under the seven days Vercel
-Queues delays, so QStash is never needed and its free plan is never touched.
+Queues delays, so the World needs no QStash.
 
 There is no cron job. Each user has one chain of `CheckIns` runs, and every
 run starts the next before it finishes, so each run's event log stays one day
@@ -65,14 +65,18 @@ cmd/dev       Run cmd/local -dev and the Vite dev server with live reload (go-de
 
 ## Run locally
 
-Needs Go 1.26, Node with pnpm, Redis, a bot token from
-[@BotFather](https://t.me/BotFather), and `AI_GATEWAY_API_KEY` or
-`ANTHROPIC_API_KEY`.
+Needs Go 1.26, Node with pnpm, Redis, and the Vercel CLI with this directory
+linked to the project (`vercel link`). The model goes through the AI Gateway
+with the project's OIDC token, which `vercel env pull` writes to `.env.local`
+along with the project's Development variables. The token expires after 12
+hours, so pull again when it does, or set `AI_GATEWAY_API_KEY` instead.
 
 ```sh
 docker run -d -p 6379:6379 redis
 pnpm install
-export REDIS_URL=redis://localhost:6379 TELEGRAM_BOT_TOKEN=... ANTHROPIC_API_KEY=... SETUP_PASSWORD=...
+vercel env pull
+set -a; source .env.local; set +a
+export REDIS_URL=redis://localhost:6379
 go run ./cmd/dev
 ```
 
@@ -103,9 +107,17 @@ functions compile, so `web/dist` is embedded in them, and serves `web/dist`
 as the static output, so only built assets are public files. It subscribes
 `api/queue.go` to the `loveloop-workflow` topic, so it has no public URL,
 and rewrites every other path to `api/index.go`, which
-serves the setup page, Telegram's webhook at `/telegram`, and the QStash
-callback. The World's RPC endpoint is not deployed because it has no
-authentication; only the signed QStash callback is public.
+serves the setup page, Telegram's webhook at `/telegram`, and the World's
+endpoints under `/v1/workflow`. The World does not authenticate its RPC
+endpoint, which the Workflow SDK web UI reads runs through, so it answers only
+requests with `WORKFLOW_HTTP_TOKEN` as a bearer token, and none when that
+is unset; webhooks are authorized by the hook token in their URL.
+
+`api/workflow-web.ts` serves the Workflow SDK web UI at `/_workflow`, linked
+from the setup page. It reads runs through `go-workflow/world-http` with
+`WORKFLOW_TARGET_WORLD`, `WORKFLOW_HTTP_BASE_URL` and `WORKFLOW_HTTP_TOKEN`,
+and answers only browsers signed in to the setup page by checking the same
+session cookie.
 
 ## Development
 

@@ -69,23 +69,13 @@ func publicURL(r *http.Request) string {
 
 func checks() []pages.Check {
 	set := func(name string) bool { return os.Getenv(name) != "" }
-	model := "AI Gateway API key"
-	switch {
-	case set("AI_GATEWAY_API_KEY"):
-	case set("ANTHROPIC_API_KEY"):
-		model = "Anthropic API key"
-	case set("VERCEL_OIDC_TOKEN"):
-		model = "AI Gateway via Vercel OIDC"
-	default:
-		model = "Set AI_GATEWAY_API_KEY or ANTHROPIC_API_KEY, or deploy on Vercel"
-	}
 	return []pages.Check{
 		{Name: "Bot token", Detail: "TELEGRAM_BOT_TOKEN", OK: set("TELEGRAM_BOT_TOKEN")},
 		{Name: "Webhook secret", Detail: "TELEGRAM_WEBHOOK_SECRET", OK: set("TELEGRAM_WEBHOOK_SECRET")},
 		{Name: "Redis", Detail: "REDIS_URL", OK: set("REDIS_URL")},
-		{Name: "Model", Detail: model, OK: set("AI_GATEWAY_API_KEY") || set("ANTHROPIC_API_KEY") || set("VERCEL_OIDC_TOKEN")},
+		{Name: "Model", Detail: "AI Gateway via AI_GATEWAY_API_KEY or Vercel OIDC", OK: set("AI_GATEWAY_API_KEY") || set("VERCEL_OIDC_TOKEN")},
 		{Name: "Approval signing", Detail: "TOOL_APPROVAL_SECRET", OK: set("TOOL_APPROVAL_SECRET"), Optional: true},
+		{Name: "Workflow RPC", Detail: "WORKFLOW_HTTP_TOKEN, for the Workflow SDK web UI", OK: set("WORKFLOW_HTTP_TOKEN"), Optional: true},
 		{Name: "Allowed users", Detail: cmp.Or(os.Getenv("TELEGRAM_ALLOWED_USERS"), "Anyone can chat"), OK: set("TELEGRAM_ALLOWED_USERS"), Optional: true},
-		{Name: "Long timers", Detail: "QSTASH_TOKEN", OK: set("QSTASH_TOKEN"), Optional: true},
 	}
 }

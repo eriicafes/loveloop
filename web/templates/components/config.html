@@ -1,0 +1,31 @@
+{{ define "config-card" }}
+{{ template "ui/card-header" props "children" (tmpl "config-header" .) }}
+{{ template "ui/card-content" props "class" "pb-2" "children" (tmpl "config-list" .) }}
+{{ end }}
+
+{{ define "config-header" }}
+{{ template "ui/card-title" props "children" "Configuration" }}
+{{ template "ui/card-description" props "children" "Environment the deployment runs with." }}
+{{ end }}
+
+{{ define "config-list" }}
+<ul class="divide-y">
+  {{ range . }}
+  <li class="flex items-start gap-3 py-3">
+    {{ if .OK }}
+    <span class="mt-0.5 w-4 text-center font-bold text-success" aria-label="set">✓</span>
+    {{ else if .Optional }}
+    <span class="mt-0.5 w-4 text-center font-bold text-muted-foreground" aria-label="optional">–</span>
+    {{ else }}
+    <span class="mt-0.5 w-4 text-center font-bold text-destructive" aria-label="missing">✕</span>
+    {{ end }}
+    <div class="min-w-0">
+      <p class="text-sm font-medium">
+        {{ .Name }}{{ if .Optional }} <span class="font-normal text-muted-foreground">(optional)</span>{{ end }}
+      </p>
+      <p class="wrap-break-word text-xs text-muted-foreground">{{ .Detail }}</p>
+    </div>
+  </li>
+  {{ end }}
+</ul>
+{{ end }}

@@ -1,0 +1,9 @@
+allowBuilds:
+  cbor-extract: set this to true or false
+minimumReleaseAgeExclude:
+  - '@cbor-extract/cbor-extract-win32-x64@2.2.3'
+  - '@workflow/errors@5.1.0'
+  - '@workflow/web@5.0.7'
+  - '@workflow/world-local@5.2.0'
+  - '@workflow/world@5.1.0'
+  - go-workflow@0.6.0

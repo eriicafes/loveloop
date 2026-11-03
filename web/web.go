@@ -54,10 +54,9 @@ type App struct {
 	WebhookSecret string
 	// AllowedUsers lists the Telegram users who may chat; empty allows all.
 	AllowedUsers []int64
-	// QStash serves the Vercel World's signed long timer callback, and
-	// Workflow serves the local World's RPC endpoint, which has no
-	// authentication. Entry points set them; Handler mounts those set.
-	QStash   http.Handler
+	// Workflow serves the World's endpoints under /v1/workflow, such as the
+	// RPC endpoint the Workflow SDK web UI reads runs through. Entry points
+	// set it from their World, protected as their network needs.
 	Workflow http.Handler
 }
 
@@ -122,9 +121,6 @@ func (a *App) Handler() http.Handler {
 	setup.Route("POST /setup/connect", a.SetupConnect)
 	setup.Route("POST /setup/disconnect", a.SetupDisconnect)
 
-	if a.QStash != nil {
-		mux.Handle("POST /v1/workflow/callbacks/qstash", a.QStash)
-	}
 	if a.Workflow != nil {
 		mux.Handle("/v1/workflow/", a.Workflow)
 	}

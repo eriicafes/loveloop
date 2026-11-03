@@ -3,7 +3,6 @@
 package store
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -99,13 +98,13 @@ func New(rdb redis.UniversalClient, prefix string) *Store {
 }
 
 // GetStore returns the Store on REDIS_URL, the Upstash Redis connection
-// string, with keys under LOVELOOP_REDIS_PREFIX or loveloop.
+// string, with keys under loveloop.
 var GetStore = got.TryUsing(func(c *got.Container) (*Store, error) {
 	options, err := redis.ParseURL(os.Getenv("REDIS_URL"))
 	if err != nil {
 		return nil, fmt.Errorf("REDIS_URL: %w", err)
 	}
-	return New(redis.NewClient(options), cmp.Or(os.Getenv("LOVELOOP_REDIS_PREFIX"), "loveloop")), nil
+	return New(redis.NewClient(options), "loveloop"), nil
 })
 
 func (s *Store) key(parts ...any) string {

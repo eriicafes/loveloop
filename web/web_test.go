@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -131,11 +130,6 @@ func TestLogin(t *testing.T) {
 			t.Errorf("setup page lacks %q", want)
 		}
 	}
-	if path := os.Getenv("LOVELOOP_DUMP_PAGES"); path != "" {
-		os.WriteFile(path+"/index.html", res.Body.Bytes(), 0o644)
-		os.WriteFile(path+"/login.html", newBrowser(t, app.Handler()).do("POST", "/login", url.Values{"password": {"wrong"}}).Body.Bytes(), 0o644)
-	}
-
 	wantRedirect(t, b.do("POST", "/logout", url.Values{}), "/login")
 	wantRedirect(t, b.do("GET", "/", nil), "/login")
 }

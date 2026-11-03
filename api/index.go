@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/eriicafes/go-workflow"
+	"github.com/eriicafes/go-workflow/worlds"
 	vercelworld "github.com/eriicafes/go-workflow/worlds/vercel"
 	"github.com/eriicafes/got"
 
@@ -17,8 +18,8 @@ import (
 // file in api as its own function, so each declares its own container.
 var indexContainer = got.New()
 
-// index is the App on the Vercel World, with the QStash callback when
-// QStash is configured.
+// index is the App on the Vercel World, with the World's endpoints. Its RPC
+// endpoint needs WORKFLOW_HTTP_TOKEN, and is closed when that is unset.
 var index = got.TryUsing(func(c *got.Container) (http.Handler, error) {
 	world, err := workflows.GetWorld.From(c)
 	if err != nil {
@@ -29,14 +30,12 @@ var index = got.TryUsing(func(c *got.Container) (http.Handler, error) {
 		return nil, err
 	}
 	app.Client = workflow.NewClient(world)
-	if os.Getenv("QSTASH_TOKEN") != "" {
-		app.QStash = vercelworld.QStash(world)
-	}
+	app.Workflow = vercelworld.HTTP(world, worlds.WithRPCToken(os.Getenv("WORKFLOW_HTTP_TOKEN")))
 	return app.Handler(), nil
 })
 
 // Index serves every public route: the setup page and its assets,
-// Telegram's webhook, and the QStash callback. vercel.json rewrites all
+// Telegram's webhook, and the World's endpoints. vercel.json rewrites all
 // paths to it.
 func Index(w http.ResponseWriter, r *http.Request) {
 	workflows.UseOIDCToken(r)
