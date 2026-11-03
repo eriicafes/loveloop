@@ -19,7 +19,7 @@
     },
     "api/workflow-web.ts": {
       "maxDuration": 30,
-      "includeFiles": "node_modules/{@workflow/web,go-workflow}/**"
+      "includeFiles": "node_modules/@workflow/**"
     }
   },
   "rewrites": [

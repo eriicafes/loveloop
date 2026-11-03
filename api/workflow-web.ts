@@ -6,6 +6,10 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { createWorkflowWebHandler } from "@workflow/web/handler";
 
+// The web UI loads WORKFLOW_TARGET_WORLD by name at runtime, so import it here
+// for Vercel to bundle it and its dependencies with the function.
+import "go-workflow/world-http";
+
 const handler = await createWorkflowWebHandler({ basename: "/_workflow" });
 
 export default {
