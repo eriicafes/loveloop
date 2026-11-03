@@ -367,7 +367,7 @@ func (u userTools) scheduleReminder(ctx context.Context, loc *time.Location, raw
 	if err != nil {
 		return scheduledReminder{}, err
 	}
-	reminder := store.Reminder{ID: run.ID(), At: at, About: in.About, Person: in.Person, EveryDays: in.EveryDays, CreatedAt: now}
+	reminder := store.Reminder{ID: run.ID(), RunID: run.ID(), At: at, About: in.About, Person: in.Person, EveryDays: in.EveryDays, CreatedAt: now}
 	if _, err := workflow.Step(ctx, u.saveReminder, scoped[store.Reminder]{ChatID: u.ChatID, Input: reminder}); err != nil {
 		return scheduledReminder{}, err
 	}
@@ -382,13 +382,17 @@ type reminderID struct {
 	ID string `json:"id" desc:"The reminder's id."`
 }
 
+// cancelReminder deletes the reminder and cancels its current run. A run
+// that has just handed off to the next still finds the reminder gone and
+// ends without firing.
 func (u userTools) cancelReminder(ctx context.Context, in reminderID) (string, error) {
-	if _, err := u.Store.Reminder(ctx, u.ChatID, in.ID); errors.Is(err, store.ErrNotFound) {
+	reminder, err := u.Store.Reminder(ctx, u.ChatID, in.ID)
+	if errors.Is(err, store.ErrNotFound) {
 		return "", workflow.FatalError(err)
 	} else if err != nil {
 		return "", err
 	}
-	run, err := workflow.Get[workflows.ReminderResult](ctx, in.ID)
+	run, err := workflow.Get[workflows.ReminderResult](ctx, cmp.Or(reminder.RunID, reminder.ID))
 	if err != nil {
 		return "", err
 	}

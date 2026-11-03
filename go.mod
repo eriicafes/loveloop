@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/digitallysavvy/go-ai v0.5.2
 	github.com/eriicafes/go-dev v0.4.0
-	github.com/eriicafes/go-workflow v0.6.0
+	github.com/eriicafes/go-workflow v0.7.0
 	github.com/eriicafes/got v0.5.0
 	github.com/eriicafes/httpx v0.5.1
 	github.com/eriicafes/tmpl v0.16.0

@@ -3,6 +3,7 @@ package flows
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -257,5 +258,59 @@ func TestScheduleReminderLimit(t *testing.T) {
 	defer mu.Unlock()
 	if len(prompts) != 2 || !strings.Contains(prompts[1], "the most allowed") {
 		t.Fatalf("the agent did not hear about the limit: %d calls", len(prompts))
+	}
+}
+
+// TestReminderChain checks that a repeating reminder fires, hands off to the
+// next run of its chain for the next day, and that cancelling it cancels the
+// current run.
+func TestReminderChain(t *testing.T) {
+	model := &testutil.MockLanguageModel{
+		DoGenerateFunc: func(context.Context, *provider.GenerateOptions) (*types.GenerateResult, error) {
+			return &types.GenerateResult{Text: "Time to call mom!", FinishReason: types.FinishReasonStop}, nil
+		},
+	}
+	ct := newConversationTest(t, model)
+	at := time.Now().Add(300 * time.Millisecond).Truncate(time.Millisecond)
+	first, err := workflow.Start(ct.ctx, workflows.Reminder{ChatID: testChatID, At: at, About: "call mom", EveryDays: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reminder := store.Reminder{ID: first.ID(), RunID: first.ID(), At: at, About: "call mom", EveryDays: 1}
+	if err := ct.store.SaveReminder(t.Context(), testChatID, reminder); err != nil {
+		t.Fatal(err)
+	}
+
+	waitFor(t, "the reminder's reply", func() bool { return len(ct.replies()) == 1 })
+	waitFor(t, "the hand-off to the next run", func() bool {
+		saved, err := ct.store.Reminder(t.Context(), testChatID, first.ID())
+		return err == nil && saved.RunID != first.ID()
+	})
+	saved, err := ct.store.Reminder(t.Context(), testChatID, first.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := at.AddDate(0, 0, 1); !saved.At.Equal(want) {
+		t.Fatalf("next time = %v, want %v", saved.At, want)
+	}
+	waitFor(t, "the first run to finish", func() bool {
+		status, err := first.Status(ct.ctx)
+		return err == nil && status == workflow.StatusCompleted
+	})
+
+	u := userTools{Flows: &Flows{Store: ct.store}, ChatID: testChatID}
+	if _, err := u.cancelReminder(ct.ctx, reminderID{ID: first.ID()}); err != nil {
+		t.Fatal(err)
+	}
+	next, err := workflow.Get[workflows.ReminderResult](ct.ctx, saved.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the next run to be cancelled", func() bool {
+		status, err := next.Status(ct.ctx)
+		return err == nil && status == workflow.StatusCancelled
+	})
+	if _, err := ct.store.Reminder(t.Context(), testChatID, first.ID()); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("reminder after cancel: %v", err)
 	}
 }

@@ -18,12 +18,12 @@ steps are recorded and survive restarts.
 | --- | --- | --- |
 | `Conversation` | The first mail in an empty mailbox | Answers the user's mailbox in order, one turn at a time: messages sent in a row as one turn, button taps, and check-in and reminder nudges. Each turn loads the user, their people, reminders, summary and recent history, runs the agent, saves the new messages, replies, then folds old history into the summary. Ends after 10 idle minutes or 10 turns. |
 | `CheckIns` | A user's first message, then itself every day | Picks a few random times in the user's waking hours, sleeps until each, and has the agent text first: overdue contacts, upcoming birthdays, a cute text idea, a date idea. Then it sleeps until the day ends and starts the next day's run. |
-| `Reminder` | The agent's `scheduleReminder` tool, as a child run | Sleeps until the reminder is due (in steps of at most 6 days), delivers it to the mailbox, and repeats every `everyDays` days until cancelled. Reminders are at most a year ahead, repeat at most daily, and a user can have 20. |
+| `Reminder` | The agent's `scheduleReminder` tool, then itself | Sleeps toward the reminder's time for at most 6 days, then starts the next run of the reminder. Once due, it delivers the reminder to the mailbox and, for a repeating reminder, starts the run for the next time, every `everyDays` days until cancelled. Reminders are at most a year ahead, repeat at most daily, and a user can have 20. |
 
 The agent's tools: `rememberPerson`, `forgetPerson` (asks for confirmation
 with Yes/No buttons through `workflowai` tool approvals), `logContact`,
 `draftText` (sends a draft with WhatsApp/Telegram buttons), `scheduleReminder`,
-`cancelReminder` (cancels the reminder's run), and `updateSettings`.
+`cancelReminder` (cancels the reminder's current run), and `updateSettings`.
 
 Every message, button tap, check-in and reminder is mail: it is pushed to
 the user's mailbox in Redis, then wakes their `Conversation` run through a
@@ -38,6 +38,12 @@ There is no cron job. Each user has one chain of `CheckIns` runs, and every
 run starts the next before it finishes, so each run's event log stays one day
 long. Every message checks that the user's chain is still running and starts
 a new one if it failed.
+
+On Vercel, each run is pinned to one deployment so it replays only the code
+that recorded it, and Vercel deletes deployments older than 30 days once three
+newer ones exist. Every workflow type embeds `workflow.StartOnLatest`, so each new
+run starts on the latest deployment: check-in chains move to new code daily,
+reminders within six days, and no run outlives its deployment.
 
 Dependencies are [got](https://github.com/eriicafes/got) constructors kept
 beside what they build: `store.GetStore`, `telegram.GetClient`,

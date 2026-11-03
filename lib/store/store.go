@@ -75,10 +75,13 @@ func (p Person) Key() string { return PersonKey(p.Name) }
 // PersonKey normalizes a name into the key a person is stored under.
 func PersonKey(name string) string { return strings.ToLower(strings.TrimSpace(name)) }
 
-// Reminder is a reminder the user asked for. Its ID is the ID of the run
-// that delivers it.
+// Reminder is a reminder the user asked for. Its ID is the ID of the first
+// run of its chain of Reminder runs, and RunID the ID of the current one.
 type Reminder struct {
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// RunID is empty for reminders saved before reminders became chains,
+	// whose only run is ID.
+	RunID     string    `json:"runId,omitempty"`
 	At        time.Time `json:"at"`
 	About     string    `json:"about"`
 	Person    string    `json:"person,omitempty"`
