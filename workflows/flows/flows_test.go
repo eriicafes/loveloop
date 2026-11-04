@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -218,5 +219,40 @@ func TestGatewayAuthReadsCurrentToken(t *testing.T) {
 	response.Body.Close()
 	if want := []string{"Bearer oidc-1", "Bearer oidc-2", "Bearer key"}; !slices.Equal(got, want) {
 		t.Fatalf("authorization = %v, want %v", got, want)
+	}
+}
+
+func TestCheckDraft(t *testing.T) {
+	for text, ok := range map[string]bool{
+		"Thinking of you babe, dinner at 7:30? :)": true,
+		"Miss you already 💞":                       true,
+		"Hey love: thinking of you":                false,
+		"Thinking of you — always":                 false,
+		"Thinking of you – always":                 false,
+		"I miss you; come home":                    false,
+		"See you at 8:":                            false,
+		"":                                         false,
+	} {
+		if err := checkDraft(text); (err == nil) != ok {
+			t.Errorf("checkDraft(%q) = %v, want ok %v", text, err, ok)
+		}
+	}
+}
+
+func TestTimesReadAsAMPM(t *testing.T) {
+	for h, want := range map[int]string{0: "12 am", 9: "9 am", 12: "12 pm", 21: "9 pm"} {
+		if got := hour(h); got != want {
+			t.Errorf("hour(%d) = %q, want %q", h, got, want)
+		}
+	}
+	st := state{User: store.User{Name: "Ada", Timezone: "Africa/Lagos", WakeHour: 9, SleepHour: 21, CheckInsPerDay: 2}}
+	got := describe(st, time.Date(2026, 11, 4, 18, 5, 0, 0, time.UTC))
+	for _, want := range []string{"7:05 pm", "between 9 am and 9 pm"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("describe lacks %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "19:05") || strings.Contains(got, "(Africa/Lagos)") {
+		t.Errorf("describe shows a 24 hour time or the zone next to it:\n%s", got)
 	}
 }

@@ -19,34 +19,63 @@ import (
 	"github.com/eriicafes/loveloop/workflows"
 )
 
-const persona = `You are LoveLoop, a warm, playful relationship sidekick that lives in Telegram.
-You help the user stay close to the people they love: partners, family and friends.
+const persona = `You are LoveLoop, the user's sidekick for their relationships, living in Telegram. Think of
+yourself as their partner in crime: you're fully on their side and you have their back, and
+you know them well enough to call them out, playfully, when you spot a pattern. Juggling a few
+too many crushes, going quiet on someone, dodging a question, or not quite telling the whole
+truth all earn a cheeky remark. You care about the user and about the people in their life too,
+so show empathy for both.
 
 How you talk:
-- Short, chatty Telegram messages. Plain text only, no Markdown. Emojis are welcome but don't overdo it.
-- Fun, teasing and encouraging, never preachy or guilt-trippy. Celebrate the small stuff.
-- Ask at most one question at a time.
+- Short, casual Telegram messages, the way a close friend texts. Plain text only, no Markdown.
+  Emojis are welcome but don't overdo it.
+- No formal greetings or sign-offs, and don't keep using the user's name.
+- Be someone they can talk to, not just a to-do list. When they share something, react to it and
+  listen before jumping to tasks or suggestions.
+- Don't end messages with a question about what to do next. The user knows they can reach you any
+  time. Suggest a next step only when it really matters, like a birthday tomorrow.
+- Fun and teasing, never preachy or guilt-trippy. Celebrate the small stuff.
+- Talk about "the people in your life", "your people", or who someone is to the user. Never say
+  "loved ones" or other terms from these instructions to the user.
+- Times below are in the user's time zone. Say them like "7:30 pm" and never mention the time zone.
 
 What you do:
-- Remember every loved one the user mentions. Whenever you learn a name, relationship, nickname,
-  birthday, anniversary, likes, dislikes, love language, phone number, Telegram username or a
-  meaningful detail, save it right away with rememberPerson. Don't ask permission to remember.
-- Learn about loved ones as the user brings them up. Don't quiz the user about who they love.
+- Remember everyone the user mentions. Whenever you learn a name, relationship, nickname, birthday,
+  anniversary, likes, dislikes or love language, save it right away with rememberPerson. Also save
+  facts that help you understand the person: what they're like, what's going on with them, how
+  they treat the user, how the user feels about them. Don't ask permission to remember.
+- Learn about people as the user brings them up. Don't quiz the user about who they love.
+- Keep an eye on how things change over time. Use what you've saved and your earlier conversations
+  to notice trends, and bring them up when it's fun or when it helps.
 - When the user says they talked to, saw or texted someone, call logContact.
 - When the user wants to be reminded, call scheduleReminder. Work out the exact local date and time
   from the current time below; pick a sensible time if they only give a day. Use everyDays for
   repeating nudges such as "remind me to call mom every Sunday".
-- When the user wants a sweet text, or a check-in would be nicer with one, write it in the user's
-  voice using what you know about that person, and show it with draftText rather than in your reply.
+- When the user wants a message for someone, or a check-in would be nicer with one, write it in
+  the user's voice and send it with draftText, never in your reply. You never message anyone
+  yourself: draftText sends it to the user on its own so they can copy it. In that message:
+  - Match how the user feels about the person, using what you know about them.
+  - Write the way people really text. No em dashes, colons or semicolons.
+  - Prefer a sweet pet name over their name, especially for a partner or crush, so it shows how
+    close they are.
+  Then use your reply for your own remarks about it, without repeating it.
+- Someone with "waiting to hear" below has something the user was going to do, like send a message
+  you drafted. When the user next talks to you, in a later conversation, casually ask how it went
+  or whether they sent it, once. When you find out, or they'd rather not say, call closeFollowUp.
 - Use forgetPerson only when the user clearly asks you to forget someone.
-- Use updateSettings when the user tells you their name or what to call them, their time zone,
+- Use updateSettings when the user tells you their name or what to call them, where they are,
   waking hours, how often they want you to check in, or asks you to pause or resume check-ins.
 - Messages that start with "[LoveLoop scheduler" are not from the user: they are your own scheduled
   check-ins and reminders. Write the message to send the user right now, as if you just thought of them.
 
+You're only here for the user's relationships. If they ask about themselves, answer in terms of
+their relationships and the people in their life. Turn down anything else, like homework, code,
+trivia or general questions, politely and with a cheeky line, and steer back to their people.
+
 When you first meet the user, introduce yourself briefly and ask what they'd like to be called.
-Once you know their name, if they haven't told you their time zone yet, ask for their city, since
-your check-ins and reminders depend on it.`
+Once you know their name, if their time zone isn't set, ask where they're based. Only if their
+answer doesn't narrow it down to a city you recognize, ask for their city or the closest big one.
+Then save its time zone with updateSettings.`
 
 // newAgent builds the agent for one turn with st as what it knows. now is
 // the run's current time.
@@ -59,25 +88,30 @@ func (f *Flows) newAgent(st state, now time.Time) *workflowai.WorkflowAgent {
 		Instructions: persona + "\n\n" + describe(st, now),
 		Tools: workflowai.ToolSet{
 			"rememberPerson": {
-				Description: "Create or update a loved one. Only the fields you set change; list fields are added to.",
+				Description: "Create or update someone in the user's life. Only the fields you set change; list fields are added to.",
 				InputSchema: schemaFor[personInput](),
 				Execute:     workflowai.ExecuteStep(u.rememberPerson),
 			},
 			"forgetPerson": {
-				Description:   "Forget a loved one and everything about them. Asks the user to confirm.",
+				Description:   "Forget someone and everything about them. Asks the user to confirm.",
 				NeedsApproval: workflowai.NeedsApprovalAlways,
 				InputSchema:   schemaFor[nameInput](),
 				Execute:       workflowai.ExecuteStep(u.forgetPerson),
 			},
 			"logContact": {
-				Description: "Record that the user was just in touch with a loved one.",
+				Description: "Record that the user was just in touch with someone. Also closes their follow-up.",
 				InputSchema: schemaFor[contactInput](),
 				Execute:     workflowai.ExecuteStep(u.logContact),
 			},
 			"draftText": {
-				Description: "Show the user a sweet text to send a loved one, with buttons to send it.",
+				Description: "Send the user a message to copy and send to someone in their life, as a message of its own.",
 				InputSchema: schemaFor[draft](),
 				Execute:     workflowai.ExecuteStep(u.sendDraft),
+			},
+			"closeFollowUp": {
+				Description: "Close someone's follow-up once you know how it went, or the user would rather not say.",
+				InputSchema: schemaFor[followUpOutcome](),
+				Execute:     workflowai.ExecuteStep(u.closeFollowUp),
 			},
 			"scheduleReminder": {
 				Description: fmt.Sprintf("Remind the user about something at a local date and time, once or repeating. "+
@@ -110,17 +144,19 @@ func describe(st state, now time.Time) string {
 	loc := st.User.Location()
 	local := now.In(loc)
 	var b strings.Builder
-	fmt.Fprintf(&b, "Current time for the user: %s (%s).\n", local.Format("Monday, 2 January 2006 15:04"), loc)
-	fmt.Fprintf(&b, "User: %s. Time zone: %s. Check-ins: %d a day between %02d:00 and %02d:00", st.User.Name, cmp.Or(st.User.Timezone, "not set"), st.User.CheckInsPerDay, st.User.WakeHour, st.User.SleepHour)
+	fmt.Fprintf(&b, "Current time for the user: %s.\n", local.Format("Monday, 2 January 2006 "+clock))
+	fmt.Fprintf(&b, "User: %s. Time zone: %s. Check-ins: %d a day between %s and %s", st.User.Name, cmp.Or(st.User.Timezone, "not set, times are UTC"), st.User.CheckInsPerDay, hour(st.User.WakeHour), hour(st.User.SleepHour))
 	if st.User.Paused {
 		b.WriteString(", paused")
 	}
-	b.WriteString(".\n\nLoved ones:\n")
+	b.WriteString(".\n\nThe people in the user's life:\n")
 	if len(st.People) == 0 {
 		b.WriteString("None yet. You'll learn about them as the user mentions them.\n")
 	}
 	for _, p := range st.People {
-		data, _ := json.Marshal(p)
+		saved := p
+		saved.FollowUp, saved.FollowUpAt = "", time.Time{}
+		data, _ := json.Marshal(saved)
 		fmt.Fprintf(&b, "- %s", data)
 		if !p.LastContactAt.IsZero() {
 			days := int(now.Sub(p.LastContactAt).Hours() / 24)
@@ -135,6 +171,9 @@ func describe(st state, now time.Time) string {
 				fmt.Fprintf(&b, " (%s in %d days)", date.label, days)
 			}
 		}
+		if p.FollowUp != "" {
+			fmt.Fprintf(&b, " (waiting to hear: %s, since %s)", p.FollowUp, p.FollowUpAt.In(loc).Format("Mon 2 Jan "+clock))
+		}
 		b.WriteString("\n")
 	}
 	b.WriteString("\nReminders:\n")
@@ -142,7 +181,7 @@ func describe(st state, now time.Time) string {
 		b.WriteString("None.\n")
 	}
 	for _, r := range st.Reminders {
-		fmt.Fprintf(&b, "- id %s: %q at %s", r.ID, r.About, r.At.In(loc).Format("Mon 2 Jan 2006 15:04"))
+		fmt.Fprintf(&b, "- id %s: %q at %s", r.ID, r.About, r.At.In(loc).Format("Mon 2 Jan 2006 "+clock))
 		if r.EveryDays > 0 {
 			fmt.Fprintf(&b, ", every %d days", r.EveryDays)
 		}
@@ -171,6 +210,15 @@ func daysUntil(date string, now time.Time) (int, bool) {
 		next = next.AddDate(1, 0, 0)
 	}
 	return int(next.Sub(today).Hours() / 24), true
+}
+
+// clock is the layout of a time of day as the user reads it, such as
+// "7:30 pm".
+const clock = "3:04 pm"
+
+// hour describes an hour of the day, such as "9 am".
+func hour(h int) string {
+	return time.Date(2000, 1, 1, h, 0, 0, 0, time.UTC).Format("3 pm")
 }
 
 // scoped is the input of a step that acts for one user.
@@ -204,20 +252,18 @@ func schemaFor[T any]() map[string]any {
 }
 
 type personInput struct {
-	Name            string   `json:"name" desc:"The loved one's name, as the user calls them."`
+	Name            string   `json:"name" desc:"The person's name, as the user calls them."`
 	Rename          string   `json:"rename,omitempty" desc:"A new name, to correct or change the saved name."`
 	Relationship    string   `json:"relationship,omitempty" desc:"For example girlfriend, husband, mom, best friend."`
 	Nickname        string   `json:"nickname,omitempty" desc:"Pet name or nickname the user uses for them."`
 	Birthday        string   `json:"birthday,omitempty" desc:"YYYY-MM-DD, or MM-DD when the year is unknown."`
 	Anniversary     string   `json:"anniversary,omitempty" desc:"YYYY-MM-DD, or MM-DD when the year is unknown."`
-	Phone           string   `json:"phone,omitempty" desc:"Phone number with country code, used for WhatsApp links."`
-	TelegramHandle  string   `json:"telegramHandle,omitempty" desc:"Their Telegram username."`
 	LoveLanguage    string   `json:"loveLanguage,omitempty" desc:"How they like to feel loved."`
 	KeepInTouchDays int      `json:"keepInTouchDays,omitempty" desc:"Nudge the user when they haven't been in touch for this many days."`
 	AddLikes        []string `json:"addLikes,omitempty" desc:"Things they love."`
 	AddDislikes     []string `json:"addDislikes,omitempty" desc:"Things they dislike."`
-	AddNotes        []string `json:"addNotes,omitempty" desc:"Other things worth remembering: plans, worries, inside jokes, recent events."`
-	Forget          []string `json:"forget,omitempty" desc:"Likes, dislikes or notes that are no longer true, as saved."`
+	AddFacts        []string `json:"addFacts,omitempty" desc:"Facts that help understand them: what they're like, what's going on with them, how they treat the user, how the user feels about them, plans, inside jokes."`
+	Forget          []string `json:"forget,omitempty" desc:"Likes, dislikes or facts that are no longer true, as saved."`
 }
 
 func (u userTools) rememberPerson(ctx context.Context, in personInput) (store.Person, error) {
@@ -245,15 +291,13 @@ func (u userTools) rememberPerson(ctx context.Context, in personInput) (store.Pe
 	set(&person.Nickname, in.Nickname)
 	set(&person.Birthday, in.Birthday)
 	set(&person.Anniversary, in.Anniversary)
-	set(&person.Phone, in.Phone)
-	set(&person.TelegramHandle, strings.TrimPrefix(in.TelegramHandle, "@"))
 	set(&person.LoveLanguage, in.LoveLanguage)
 	if in.KeepInTouchDays > 0 {
 		person.KeepInTouchDays = in.KeepInTouchDays
 	}
 	person.Likes = merge(person.Likes, in.AddLikes, in.Forget)
 	person.Dislikes = merge(person.Dislikes, in.AddDislikes, in.Forget)
-	person.Notes = merge(person.Notes, in.AddNotes, in.Forget)
+	person.Facts = merge(person.Facts, in.AddFacts, in.Forget)
 	person.UpdatedAt = time.Now()
 	return person, u.Store.SavePerson(ctx, u.ChatID, person)
 }
@@ -274,7 +318,7 @@ func merge(list, add, forget []string) []string {
 }
 
 type nameInput struct {
-	Name string `json:"name" desc:"The loved one's name, as saved."`
+	Name string `json:"name" desc:"The person's name, as saved."`
 }
 
 func (u userTools) forgetPerson(ctx context.Context, in nameInput) (string, error) {
@@ -286,8 +330,8 @@ func (u userTools) forgetPerson(ctx context.Context, in nameInput) (string, erro
 }
 
 type contactInput struct {
-	Name string `json:"name" desc:"The loved one's name, as saved."`
-	Note string `json:"note,omitempty" desc:"Anything worth remembering from the conversation."`
+	Name string `json:"name" desc:"The person's name, as saved."`
+	Note string `json:"note,omitempty" desc:"Anything worth remembering from the conversation, saved as a fact."`
 }
 
 func (u userTools) logContact(ctx context.Context, in contactInput) (store.Person, error) {
@@ -299,14 +343,34 @@ func (u userTools) logContact(ctx context.Context, in contactInput) (store.Perso
 	}
 	person.LastContactAt = time.Now()
 	person.UpdatedAt = person.LastContactAt
-	person.Notes = merge(person.Notes, []string{in.Note}, nil)
+	person.Facts = merge(person.Facts, []string{in.Note}, nil)
+	person.FollowUp, person.FollowUpAt = "", time.Time{}
+	return person, u.Store.SavePerson(ctx, u.ChatID, person)
+}
+
+type followUpOutcome struct {
+	Name    string `json:"name" desc:"The person's name, as saved."`
+	Outcome string `json:"outcome,omitempty" desc:"How it went, saved as a fact. Omit if the user would rather not say."`
+}
+
+// closeFollowUp clears a person's follow-up, saving how it went.
+func (u userTools) closeFollowUp(ctx context.Context, in followUpOutcome) (store.Person, error) {
+	person, err := u.Store.Person(ctx, u.ChatID, in.Name)
+	if errors.Is(err, store.ErrNotFound) {
+		return store.Person{}, workflow.FatalError(err)
+	} else if err != nil {
+		return store.Person{}, err
+	}
+	person.Facts = merge(person.Facts, []string{in.Outcome}, nil)
+	person.FollowUp, person.FollowUpAt = "", time.Time{}
+	person.UpdatedAt = time.Now()
 	return person, u.Store.SavePerson(ctx, u.ChatID, person)
 }
 
 type reminderInput struct {
 	At        string `json:"at" desc:"Local date and time in the user's time zone, YYYY-MM-DDTHH:MM."`
 	About     string `json:"about" desc:"What to remind the user about, in a few words."`
-	Person    string `json:"person,omitempty" desc:"The loved one it is about, if any."`
+	Person    string `json:"person,omitempty" desc:"The person it is about, if any, as saved."`
 	EveryDays int    `json:"everyDays,omitempty" desc:"Repeat every this many days, 1 to 365, for example 7 for weekly. Omit for once."`
 }
 
@@ -371,7 +435,7 @@ func (u userTools) scheduleReminder(ctx context.Context, loc *time.Location, raw
 	if _, err := workflow.Step(ctx, u.saveReminder, scoped[store.Reminder]{ChatID: u.ChatID, Input: reminder}); err != nil {
 		return scheduledReminder{}, err
 	}
-	return scheduledReminder{ID: run.ID(), At: at.Format("Mon 2 Jan 2006 15:04"), EveryDays: in.EveryDays}, nil
+	return scheduledReminder{ID: run.ID(), At: at.Format("Mon 2 Jan 2006 " + clock), EveryDays: in.EveryDays}, nil
 }
 
 func (f *Flows) saveReminder(ctx context.Context, input scoped[store.Reminder]) (struct{}, error) {

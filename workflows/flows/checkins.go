@@ -138,6 +138,9 @@ func (f *Flows) planCheckIn(ctx context.Context, chatID int64) (string, error) {
 	now := time.Now().In(user.Location())
 	var ideas []string
 	for _, p := range people {
+		if p.FollowUp != "" && now.Sub(p.FollowUpAt) >= 20*time.Hour {
+			ideas = append(ideas, fmt.Sprintf("Waiting to hear how it went with %s: %s. Casually ask how it went or whether they did it.", p.Name, p.FollowUp))
+		}
 		if p.KeepInTouchDays > 0 && !p.LastContactAt.IsZero() && now.Sub(p.LastContactAt) >= time.Duration(p.KeepInTouchDays)*24*time.Hour {
 			ideas = append(ideas, fmt.Sprintf("It's been a while since they were in touch with %s. Nudge them gently and offer a cute text to send with draftText.", p.Name))
 		}

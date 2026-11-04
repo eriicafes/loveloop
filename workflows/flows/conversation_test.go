@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -196,6 +197,72 @@ func TestConversationRunsToolSteps(t *testing.T) {
 	}
 	if person.Relationship != "girlfriend" || len(person.Likes) != 1 || person.Likes[0] != "tulips" {
 		t.Fatalf("saved person = %+v", person)
+	}
+}
+
+// TestDraftFollowUp checks that a draft reaches the user as a message of its
+// own before the agent's remarks, sets the person's follow-up, that a draft
+// with unnatural punctuation is sent back to the agent, and that
+// closeFollowUp clears the follow-up and saves how it went.
+func TestDraftFollowUp(t *testing.T) {
+	calls := 0
+	var draftErrors []string
+	model := &testutil.MockLanguageModel{
+		ToolSupport: true,
+		DoGenerateFunc: func(ctx context.Context, opts *provider.GenerateOptions) (*types.GenerateResult, error) {
+			calls++
+			switch calls {
+			case 1:
+				return toolCall("draftText", map[string]any{"person": "Sarah", "text": "Hey love: thinking of you"}), nil
+			case 2:
+				result, _ := json.Marshal(opts.Prompt.Messages[len(opts.Prompt.Messages)-1])
+				draftErrors = append(draftErrors, string(result))
+				return toolCall("draftText", map[string]any{"person": "Sarah", "text": "Thinking of you babe, dinner at 7:30? :)"}), nil
+			case 3:
+				return &types.GenerateResult{Text: "She's going to melt 🫠", FinishReason: types.FinishReasonStop}, nil
+			case 4:
+				return toolCall("closeFollowUp", map[string]any{"name": "Sarah", "outcome": "Loved the dinner text"}), nil
+			default:
+				return &types.GenerateResult{Text: "Told you 😌", FinishReason: types.FinishReasonStop}, nil
+			}
+		},
+	}
+	ct := newConversationTest(t, model)
+	if err := ct.store.SavePerson(t.Context(), testChatID, store.Person{Name: "Sarah", Relationship: "girlfriend"}); err != nil {
+		t.Fatal(err)
+	}
+
+	ct.deliver(t, "write something sweet for Sarah")
+	waitFor(t, "the draft and remarks", func() bool { return len(ct.replies()) == 2 })
+	if replies := ct.replies(); replies[0] != "Thinking of you babe, dinner at 7:30? :)" || replies[1] != "She's going to melt 🫠" {
+		t.Fatalf("replies = %q", replies)
+	}
+	if len(draftErrors) != 1 || !strings.Contains(draftErrors[0], "without colons") {
+		t.Fatalf("the agent did not hear about the colon: %q", draftErrors)
+	}
+	person, err := ct.store.Person(t.Context(), testChatID, "sarah")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(person.FollowUp, "dinner at 7:30") || person.FollowUpAt.IsZero() {
+		t.Fatalf("follow-up = %q at %v", person.FollowUp, person.FollowUpAt)
+	}
+
+	ct.deliver(t, "she loved it!")
+	waitFor(t, "the reply", func() bool { return len(ct.replies()) == 3 })
+	person, err = ct.store.Person(t.Context(), testChatID, "sarah")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if person.FollowUp != "" || !slices.Contains(person.Facts, "Loved the dinner text") {
+		t.Fatalf("after closeFollowUp: %+v", person)
+	}
+}
+
+func toolCall(name string, args map[string]any) *types.GenerateResult {
+	return &types.GenerateResult{
+		FinishReason: types.FinishReasonToolCalls,
+		ToolCalls:    []types.ToolCall{{ID: "call-" + name, ToolName: name, Arguments: args}},
 	}
 }
 

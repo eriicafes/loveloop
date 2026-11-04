@@ -1,9 +1,11 @@
 # LoveLoop 💞
 
-A Telegram relationship sidekick. It remembers your loved ones (names,
-nicknames, birthdays, likes, love languages, little details), reminds you to
-keep in touch, drafts cute texts you can send with one tap, and texts you
-first a few times a day at random.
+A Telegram relationship sidekick. It remembers the people in your life
+(names, nicknames, birthdays, likes, love languages, and facts about them),
+notices how things change over time and playfully calls you out, reminds you
+to keep in touch, writes messages for you to copy and send, asks how they
+went, and texts you first a few times a day at random. It only talks about
+your relationships and turns everything else down.
 
 It is a Go app on Vercel built on
 [go-workflow](https://github.com/eriicafes/go-workflow): every conversation
@@ -22,8 +24,15 @@ steps are recorded and survive restarts.
 
 The agent's tools: `rememberPerson`, `forgetPerson` (asks for confirmation
 with Yes/No buttons through `workflowai` tool approvals), `logContact`,
-`draftText` (sends a draft with WhatsApp/Telegram buttons), `scheduleReminder`,
-`cancelReminder` (cancels the reminder's current run), and `updateSettings`.
+`draftText` (sends a message for the user to copy as a message of its own,
+before the agent's remarks, and rejects dashes, semicolons and label colons),
+`closeFollowUp`, `scheduleReminder`, `cancelReminder` (cancels the reminder's
+current run), and `updateSettings`.
+
+A draft, or a reminder about someone, sets that person's follow-up. The agent
+asks how it went the next time the user talks to it, or in a check-in a day
+later, and closes it with `closeFollowUp` or `logContact`, saving the outcome
+as a fact.
 
 Every message, button tap, check-in and reminder is mail: it is pushed to
 the user's mailbox in Redis, then wakes their `Conversation` run through a

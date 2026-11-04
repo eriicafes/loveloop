@@ -53,20 +53,26 @@ func (u User) Location() *time.Location {
 
 // Person is one of the user's loved ones.
 type Person struct {
-	Name            string    `json:"name"`
-	Relationship    string    `json:"relationship,omitempty"`
-	Nickname        string    `json:"nickname,omitempty"`
-	Birthday        string    `json:"birthday,omitempty"`
-	Anniversary     string    `json:"anniversary,omitempty"`
-	Phone           string    `json:"phone,omitempty"`
-	TelegramHandle  string    `json:"telegramHandle,omitempty"`
-	LoveLanguage    string    `json:"loveLanguage,omitempty"`
-	Likes           []string  `json:"likes,omitempty"`
-	Dislikes        []string  `json:"dislikes,omitempty"`
-	Notes           []string  `json:"notes,omitempty"`
+	Name         string   `json:"name"`
+	Relationship string   `json:"relationship,omitempty"`
+	Nickname     string   `json:"nickname,omitempty"`
+	Birthday     string   `json:"birthday,omitempty"`
+	Anniversary  string   `json:"anniversary,omitempty"`
+	LoveLanguage string   `json:"loveLanguage,omitempty"`
+	Likes        []string `json:"likes,omitempty"`
+	Dislikes     []string `json:"dislikes,omitempty"`
+	// Facts help the agent understand the person: what they're like,
+	// what's going on with them, and how things are between them and the
+	// user.
+	Facts           []string  `json:"facts,omitempty"`
 	KeepInTouchDays int       `json:"keepInTouchDays,omitempty"`
 	LastContactAt   time.Time `json:"lastContactAt,omitzero"`
-	UpdatedAt       time.Time `json:"updatedAt"`
+	// FollowUp is something the user was going to do with the person, such
+	// as send a drafted message, that the agent asks about next time.
+	// FollowUpAt is when it was set.
+	FollowUp   string    `json:"followUp,omitempty"`
+	FollowUpAt time.Time `json:"followUpAt,omitzero"`
+	UpdatedAt  time.Time `json:"updatedAt"`
 }
 
 // Key is the name a person is stored under.

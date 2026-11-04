@@ -51,11 +51,17 @@ func (f *Flows) Reminder(ctx context.Context, input workflows.Reminder) (workflo
 
 	reason := fmt.Sprintf("Reminder the user asked for: %q.", input.About)
 	if input.Person != "" {
-		reason += fmt.Sprintf(" It's about %s; offer a cute text for them with draftText if it fits.", input.Person)
+		reason += fmt.Sprintf(" It's about %s; offer a message for them with draftText if it fits.", input.Person)
 	}
 	mail := scoped[store.Mail]{ChatID: input.ChatID, Input: store.Mail{Nudge: reason}}
 	if _, err := workflow.Step(ctx, f.deliverMail, mail); err != nil {
 		return result, err
+	}
+	if input.Person != "" {
+		followUp := store.Person{Name: input.Person, FollowUp: fmt.Sprintf("you reminded the user to %s", input.About)}
+		if _, err := workflow.Step(ctx, f.setFollowUp, scoped[store.Person]{ChatID: input.ChatID, Input: followUp}); err != nil {
+			return result, err
+		}
 	}
 	result.Fired++
 	if input.EveryDays <= 0 {
@@ -121,4 +127,17 @@ func (f *Flows) moveReminder(ctx context.Context, input scoped[store.Reminder]) 
 // deleteReminder deletes a one-off reminder that has fired.
 func (f *Flows) deleteReminder(ctx context.Context, input scoped[string]) (struct{}, error) {
 	return struct{}{}, f.Store.DeleteReminder(ctx, input.ChatID, input.Input)
+}
+
+// setFollowUp sets a saved person's follow-up, so the agent asks how it went
+// next time. It does nothing for someone LoveLoop doesn't know.
+func (f *Flows) setFollowUp(ctx context.Context, input scoped[store.Person]) (struct{}, error) {
+	person, err := f.Store.Person(ctx, input.ChatID, input.Input.Name)
+	if errors.Is(err, store.ErrNotFound) {
+		return struct{}{}, nil
+	} else if err != nil {
+		return struct{}{}, err
+	}
+	person.FollowUp, person.FollowUpAt = input.Input.FollowUp, time.Now()
+	return struct{}{}, f.Store.SavePerson(ctx, input.ChatID, person)
 }
