@@ -8,7 +8,7 @@
       </div>
     </div>
     <div class="ml-auto flex items-center gap-1">
-      <a href="/_workflow" class="inline-flex h-8 items-center rounded-md px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground">Workflows</a>
+      {{ template "ui/button" props "href" "/_workflow" "variant" "ghost" "size" "sm" "children" "Workflows" }}
       <form method="post" action="/logout">
         {{ template "ui/button" props "type" "submit" "variant" "ghost" "size" "sm" "children" "Sign out" }}
       </form>

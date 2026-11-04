@@ -11,8 +11,6 @@
   <dd class="min-w-0 break-all">
     {{ with .Webhook.URL }}<code class="font-mono text-[13px]">{{ . }}</code>{{ else }}<span class="text-muted-foreground">nowhere</span>{{ end }}
   </dd>
-  <dt class="text-muted-foreground">Pending updates</dt>
-  <dd>{{ .Webhook.PendingUpdateCount }}</dd>
   {{ with .LastError }}
   <dt class="text-muted-foreground">Last error</dt>
   <dd class="min-w-0 wrap-break-word text-destructive">{{ . }}</dd>

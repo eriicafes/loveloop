@@ -3,27 +3,34 @@
     children  string or template
     variant   default | outline | outline-destructive | ghost | destructive
     size      default | sm | lg
+    href      renders a link styled as a button instead of a button
     type      button type, default "button"
     name, value, form, class
 */}}
 {{ define "ui/button" }}
+{{ if .href }}
+<a href="{{ .href }}" class="{{ template "ui/button-class" . }}">{{ render .children }}</a>
+{{ else }}
 <button
   type="{{ or .type "button" }}"
   {{ with .name }}name="{{ . }}"{{ end }}
   {{ with .value }}value="{{ . }}"{{ end }}
   {{ with .form }}form="{{ . }}"{{ end }}
-  class="{{ clsx
-    "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50"
-    (or (not .variant) (eq .variant "default")) "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
-    (eq .variant "outline") "border bg-card text-foreground hover:bg-accent hover:text-accent-foreground"
-    (eq .variant "outline-destructive") "border bg-card text-destructive hover:bg-destructive-soft"
-    (eq .variant "ghost") "text-foreground hover:bg-accent hover:text-accent-foreground"
-    (eq .variant "destructive") "bg-destructive text-white shadow-sm hover:bg-destructive/90"
-    (or (not .size) (eq .size "default")) "h-10 px-4 text-sm"
-    (eq .size "sm") "h-8 px-3 text-xs"
-    (eq .size "lg") "h-11 px-6 text-base"
-    .class
-  }}">
+  class="{{ template "ui/button-class" . }}">
   {{ render .children }}
 </button>
 {{ end }}
+{{ end }}
+
+{{ define "ui/button-class" }}{{ clsx
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50"
+  (or (not .variant) (eq .variant "default")) "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+  (eq .variant "outline") "border bg-card text-foreground hover:bg-accent hover:text-accent-foreground"
+  (eq .variant "outline-destructive") "border bg-card text-destructive hover:bg-destructive-soft"
+  (eq .variant "ghost") "text-foreground hover:bg-accent hover:text-accent-foreground"
+  (eq .variant "destructive") "bg-destructive text-white shadow-sm hover:bg-destructive/90"
+  (or (not .size) (eq .size "default")) "h-10 px-4 text-sm"
+  (eq .size "sm") "h-8 px-3 text-xs"
+  (eq .size "lg") "h-11 px-6 text-base"
+  .class
+}}{{ end }}
