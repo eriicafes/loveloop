@@ -14,6 +14,9 @@ import (
 // gatewayURL is the AI Gateway's OpenAI-compatible API. go-ai's gateway
 // provider sends an outdated request body that the gateway rejects with
 // "Invalid input", so LoveLoop talks to the gateway through this API instead.
+//
+// TODO: switch back to go-ai's gateway provider once its next release
+// includes https://github.com/digitallysavvy/go-ai/pull/86.
 const gatewayURL = "https://ai-gateway.vercel.sh/v1"
 
 // GetModel returns the model named by MODEL through the AI Gateway's
