@@ -75,7 +75,7 @@ func (f *Flows) respond(ctx context.Context, st state, history, turn []workflowa
 	if _, err := workflow.Step(ctx, f.appendHistory, historyAppend{ChatID: chatID, Messages: added}); err != nil {
 		return "", err
 	}
-	r := reply{ChatID: chatID, Text: result.Text, Approvals: approvalQuestions(result.Messages)}
+	r := reply{ChatID: chatID, Text: result.Text, Drafts: draftsIn(result), Approvals: approvalQuestions(result.Messages)}
 	if r.Text == "" && len(r.Approvals) == 0 && len(result.ToolResults) == 0 {
 		r.Text = "💞"
 	}

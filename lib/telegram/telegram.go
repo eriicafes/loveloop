@@ -145,16 +145,25 @@ type SendMessageParams struct {
 	Text        string                `json:"text"`
 	ParseMode   string                `json:"parse_mode,omitempty"`
 	ReplyMarkup *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
+	// ReplyParameters makes the message a reply quoting another one.
+	ReplyParameters *ReplyParameters `json:"reply_parameters,omitempty"`
 	// LinkPreviewOptions turns link previews off by default.
 	LinkPreviewOptions map[string]any `json:"link_preview_options,omitempty"`
 }
 
+// ReplyParameters names the message a reply quotes.
+type ReplyParameters struct {
+	MessageID int64 `json:"message_id"`
+}
+
 // SendMessage sends a plain text message, split into several when it is
-// longer than MaxMessageLength. The keyboard goes on the last one.
-func (c *Client) SendMessage(ctx context.Context, params SendMessageParams) error {
+// longer than MaxMessageLength, and returns the first one. The keyboard goes
+// on the last one, and the reply on the first.
+func (c *Client) SendMessage(ctx context.Context, params SendMessageParams) (Message, error) {
 	if params.LinkPreviewOptions == nil {
 		params.LinkPreviewOptions = map[string]any{"is_disabled": true}
 	}
+	var first Message
 	chunks := Split(params.Text, MaxMessageLength)
 	for i, chunk := range chunks {
 		part := params
@@ -162,11 +171,18 @@ func (c *Client) SendMessage(ctx context.Context, params SendMessageParams) erro
 		if i < len(chunks)-1 {
 			part.ReplyMarkup = nil
 		}
-		if err := c.Call(ctx, "sendMessage", part, nil); err != nil {
-			return err
+		if i > 0 {
+			part.ReplyParameters = nil
+		}
+		var sent Message
+		if err := c.Call(ctx, "sendMessage", part, &sent); err != nil {
+			return first, err
+		}
+		if i == 0 {
+			first = sent
 		}
 	}
-	return nil
+	return first, nil
 }
 
 // SendChatAction shows an action such as "typing" in the chat.

@@ -36,6 +36,9 @@ type conversationTest struct {
 	store *store.Store
 	mu    sync.Mutex
 	sent  []string
+	// replyTo holds, for each sent message, the message it replies to, or
+	// 0. Sent messages get IDs 1, 2, 3 and so on.
+	replyTo []int64
 }
 
 func newConversationTest(t *testing.T, model provider.LanguageModel) *conversationTest {
@@ -66,9 +69,17 @@ func newConversationTest(t *testing.T, model provider.LanguageModel) *conversati
 		var params map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&params)
 		if strings.HasSuffix(r.URL.Path, "/sendMessage") {
+			var replyTo int64
+			if reply, ok := params["reply_parameters"].(map[string]any); ok {
+				replyTo = int64(reply["message_id"].(float64))
+			}
 			ct.mu.Lock()
 			ct.sent = append(ct.sent, params["text"].(string))
+			ct.replyTo = append(ct.replyTo, replyTo)
+			id := len(ct.sent)
 			ct.mu.Unlock()
+			json.NewEncoder(w).Encode(map[string]any{"ok": true, "result": map[string]any{"message_id": id}})
+			return
 		}
 		json.NewEncoder(w).Encode(map[string]any{"ok": true, "result": true})
 	}))
@@ -200,10 +211,11 @@ func TestConversationRunsToolSteps(t *testing.T) {
 	}
 }
 
-// TestDraftFollowUp checks that a draft reaches the user as a message of its
-// own before the agent's remarks, sets the person's follow-up, that a draft
-// with unnatural punctuation is sent back to the agent, and that
-// closeFollowUp clears the follow-up and saves how it went.
+// TestDraftFollowUp checks that a draft with unnatural punctuation is sent
+// back to the agent, that a draft ends the turn and reaches the user after
+// the agent's words as a message of its own with a "For" reply tagging it,
+// that it sets the person's follow-up, and that closeFollowUp clears the
+// follow-up and saves how it went.
 func TestDraftFollowUp(t *testing.T) {
 	calls := 0
 	var draftErrors []string
@@ -213,14 +225,14 @@ func TestDraftFollowUp(t *testing.T) {
 			calls++
 			switch calls {
 			case 1:
-				return toolCall("draftText", map[string]any{"person": "Sarah", "text": "Hey love: thinking of you"}), nil
+				return toolCall("draftText", map[string]any{"person": "sarah", "text": "Hey love: thinking of you"}), nil
 			case 2:
 				result, _ := json.Marshal(opts.Prompt.Messages[len(opts.Prompt.Messages)-1])
 				draftErrors = append(draftErrors, string(result))
-				return toolCall("draftText", map[string]any{"person": "Sarah", "text": "Thinking of you babe, dinner at 7:30? :)"}), nil
+				draft := toolCall("draftText", map[string]any{"person": "sarah", "text": "Thinking of you babe, dinner at 7:30? :)"})
+				draft.Text = "Say less 😏"
+				return draft, nil
 			case 3:
-				return &types.GenerateResult{Text: "She's going to melt 🫠", FinishReason: types.FinishReasonStop}, nil
-			case 4:
 				return toolCall("closeFollowUp", map[string]any{"name": "Sarah", "outcome": "Loved the dinner text"}), nil
 			default:
 				return &types.GenerateResult{Text: "Told you 😌", FinishReason: types.FinishReasonStop}, nil
@@ -233,9 +245,19 @@ func TestDraftFollowUp(t *testing.T) {
 	}
 
 	ct.deliver(t, "write something sweet for Sarah")
-	waitFor(t, "the draft and remarks", func() bool { return len(ct.replies()) == 2 })
-	if replies := ct.replies(); replies[0] != "Thinking of you babe, dinner at 7:30? :)" || replies[1] != "She's going to melt 🫠" {
-		t.Fatalf("replies = %q", replies)
+	waitFor(t, "the words, draft and tag", func() bool { return len(ct.replies()) == 3 })
+	want := []string{"Say less 😏", "Thinking of you babe, dinner at 7:30? :)", "For Sarah"}
+	if replies := ct.replies(); !slices.Equal(replies, want) {
+		t.Fatalf("replies = %q, want %q", replies, want)
+	}
+	ct.mu.Lock()
+	replyTo := slices.Clone(ct.replyTo)
+	ct.mu.Unlock()
+	if !slices.Equal(replyTo, []int64{0, 0, 2}) {
+		t.Fatalf("replies quote %v, want the tag to quote the draft", replyTo)
+	}
+	if calls != 2 {
+		t.Fatalf("model calls = %d, want the turn to end with the draft", calls)
 	}
 	if len(draftErrors) != 1 || !strings.Contains(draftErrors[0], "without colons") {
 		t.Fatalf("the agent did not hear about the colon: %q", draftErrors)
@@ -249,7 +271,7 @@ func TestDraftFollowUp(t *testing.T) {
 	}
 
 	ct.deliver(t, "she loved it!")
-	waitFor(t, "the reply", func() bool { return len(ct.replies()) == 3 })
+	waitFor(t, "the reply", func() bool { return len(ct.replies()) == 4 })
 	person, err = ct.store.Person(t.Context(), testChatID, "sarah")
 	if err != nil {
 		t.Fatal(err)

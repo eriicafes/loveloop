@@ -142,11 +142,11 @@ func (f *Flows) planCheckIn(ctx context.Context, chatID int64) (string, error) {
 			ideas = append(ideas, fmt.Sprintf("Waiting to hear how it went with %s: %s. Casually ask how it went or whether they did it.", p.Name, p.FollowUp))
 		}
 		if p.KeepInTouchDays > 0 && !p.LastContactAt.IsZero() && now.Sub(p.LastContactAt) >= time.Duration(p.KeepInTouchDays)*24*time.Hour {
-			ideas = append(ideas, fmt.Sprintf("It's been a while since they were in touch with %s. Nudge them gently and offer a cute text to send with draftText.", p.Name))
+			ideas = append(ideas, fmt.Sprintf("It's been a while since they were in touch with %s. Nudge them gently, and write them a message with draftText if it fits.", p.Name))
 		}
 		for _, date := range []struct{ label, value string }{{"birthday", p.Birthday}, {"anniversary", p.Anniversary}} {
 			if days, ok := daysUntil(date.value, now); ok && days <= 14 {
-				ideas = append(ideas, fmt.Sprintf("%s's %s is in %d days. Help them get ready: a plan, a gift idea, or a sweet message.", p.Name, date.label, days))
+				ideas = append(ideas, fmt.Sprintf("%s's %s is in %d days. Give them a heads up with a gift or plan idea, or write a message for them with draftText.", p.Name, date.label, days))
 			}
 		}
 	}

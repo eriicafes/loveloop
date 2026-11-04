@@ -3,6 +3,7 @@ package flows
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -62,11 +63,12 @@ func (f *Flows) appendHistory(ctx context.Context, input historyAppend) (struct{
 	return struct{}{}, f.Store.AppendHistory(ctx, input.ChatID, input.Messages)
 }
 
-// reply is a message to the user, with buttons for the agent's pending
-// approvals.
+// reply is a message to the user, then the drafts the agent wrote, then
+// buttons for the agent's pending approvals.
 type reply struct {
 	ChatID    int64             `json:"chatId"`
 	Text      string            `json:"text"`
+	Drafts    []queuedDraft     `json:"drafts,omitempty"`
 	Approvals []pendingApproval `json:"approvals,omitempty"`
 }
 
@@ -78,13 +80,29 @@ type pendingApproval struct {
 func (f *Flows) sendReply(ctx context.Context, r reply) (struct{}, error) {
 	bot := f.Bot
 	if text := strings.TrimSpace(r.Text); text != "" {
-		if err := bot.SendMessage(ctx, telegram.SendMessageParams{ChatID: r.ChatID, Text: text}); err != nil {
+		if _, err := bot.SendMessage(ctx, telegram.SendMessageParams{ChatID: r.ChatID, Text: text}); err != nil {
+			return struct{}{}, err
+		}
+	}
+	for _, d := range r.Drafts {
+		// The draft is a message of its own so it copies cleanly, and the
+		// reply under it says who it's for.
+		sent, err := bot.SendMessage(ctx, telegram.SendMessageParams{ChatID: r.ChatID, Text: d.Text})
+		if err != nil {
+			return struct{}{}, err
+		}
+		_, err = bot.SendMessage(ctx, telegram.SendMessageParams{
+			ChatID:          r.ChatID,
+			Text:            "For " + d.Person,
+			ReplyParameters: &telegram.ReplyParameters{MessageID: sent.MessageID},
+		})
+		if err != nil {
 			return struct{}{}, err
 		}
 	}
 	for _, approval := range r.Approvals {
 		key := approvalKey(approval.ID)
-		err := bot.SendMessage(ctx, telegram.SendMessageParams{
+		_, err := bot.SendMessage(ctx, telegram.SendMessageParams{
 			ChatID: r.ChatID,
 			Text:   approval.Question,
 			ReplyMarkup: &telegram.InlineKeyboardMarkup{InlineKeyboard: [][]telegram.InlineKeyboardButton{{
@@ -114,19 +132,27 @@ type draft struct {
 	Text   string `json:"text" desc:"The message, in the user's voice, ready to copy and send as is."`
 }
 
-// sendDraft sends the user a draft as a message of its own, so it copies
-// cleanly, and sets the person's follow-up so the agent asks how it went.
-// LoveLoop never sends it to the person: the user does.
-func (u userTools) sendDraft(ctx context.Context, in draft) (string, error) {
+// queuedDraft is a checked draft, sent after the agent's reply. Person is
+// the name the user knows them by.
+type queuedDraft struct {
+	Person string `json:"person"`
+	Text   string `json:"text"`
+	Note   string `json:"note"`
+}
+
+// queueDraft checks a draft and sets the person's follow-up so the agent asks
+// how it went. The draft is sent after the agent's reply, which ends with
+// it: the agent writes nothing after a draft. LoveLoop never sends it to the
+// person: the user does.
+func (u userTools) queueDraft(ctx context.Context, in draft) (queuedDraft, error) {
 	text := strings.TrimSpace(in.Text)
 	if err := checkDraft(text); err != nil {
-		return "", workflow.FatalError(err)
+		return queuedDraft{}, workflow.FatalError(err)
 	}
-	if err := u.Bot.SendMessage(ctx, telegram.SendMessageParams{ChatID: u.ChatID, Text: text}); err != nil {
-		return "", err
-	}
-	person, err := u.Store.Person(ctx, u.ChatID, in.Person)
+	name := strings.TrimSpace(in.Person)
+	person, err := u.Store.Person(ctx, u.ChatID, name)
 	if err == nil {
+		name = person.Name
 		person.FollowUp = fmt.Sprintf("you drafted %q for the user to send them", text)
 		person.FollowUpAt = time.Now()
 		err = u.Store.SavePerson(ctx, u.ChatID, person)
@@ -134,9 +160,24 @@ func (u userTools) sendDraft(ctx context.Context, in draft) (string, error) {
 		err = nil
 	}
 	if err != nil {
-		return "", err
+		return queuedDraft{}, err
 	}
-	return "Sent to the user as its own message, for them to copy. Add your remarks in your reply without repeating it.", nil
+	note := fmt.Sprintf("The user gets it after your words as its own message, then a reply tagging it that says %q. Your turn ends here.", "For "+name)
+	return queuedDraft{Person: name, Text: text, Note: note}, nil
+}
+
+// draftsIn returns the drafts the agent queued in result, in order.
+func draftsIn(result workflowai.Result) []queuedDraft {
+	var drafts []queuedDraft
+	for _, step := range result.Steps {
+		for _, tool := range step.ToolResults {
+			var d queuedDraft
+			if tool.ToolName == "draftText" && !tool.IsError && json.Unmarshal(tool.Output, &d) == nil && d.Text != "" {
+				drafts = append(drafts, d)
+			}
+		}
+	}
+	return drafts
 }
 
 // checkDraft rejects a draft that doesn't read like a real text: one with em

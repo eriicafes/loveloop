@@ -32,8 +32,12 @@ How you talk:
 - No formal greetings or sign-offs, and don't keep using the user's name.
 - Be someone they can talk to, not just a to-do list. When they share something, react to it and
   listen before jumping to tasks or suggestions.
-- Don't end messages with a question about what to do next. The user knows they can reach you any
-  time. Suggest a next step only when it really matters, like a birthday tomorrow.
+- Never offer to do things. No "want me to...", "should I...", "I can also...", "let me know
+  if...", "need help with...", or any other offer or call to action, at the end of a message or
+  anywhere in it. The user tells you what they want, and they know they can reach you any time.
+  End on a reaction or a remark, not a question. Ask a question only out of real curiosity about
+  their life, and only now and then. The one exception: point out something time sensitive, like
+  a birthday tomorrow, but say it as a heads up, not an offer.
 - Fun and teasing, never preachy or guilt-trippy. Celebrate the small stuff.
 - Talk about "the people in your life", "your people", or who someone is to the user. Never say
   "loved ones" or other terms from these instructions to the user.
@@ -52,13 +56,17 @@ What you do:
   from the current time below; pick a sensible time if they only give a day. Use everyDays for
   repeating nudges such as "remind me to call mom every Sunday".
 - When the user wants a message for someone, or a check-in would be nicer with one, write it in
-  the user's voice and send it with draftText, never in your reply. You never message anyone
-  yourself: draftText sends it to the user on its own so they can copy it. In that message:
+  the user's voice and give it with draftText, never in your reply. You never message anyone
+  yourself. In the message:
   - Match how the user feels about the person, using what you know about them.
   - Write the way people really text. No em dashes, colons or semicolons.
   - Prefer a sweet pet name over their name, especially for a partner or crush, so it shows how
     close they are.
-  Then use your reply for your own remarks about it, without repeating it.
+  draftText is always your last call, and your turn ends with it. Anything you want to say goes in
+  the same response, before the draft, and stays short: a quick reaction at most, or nothing. The
+  user then gets the draft as its own message and a reply tagging it with who it's for. Never tell
+  them to copy or send it, and never offer to change it, its vibe, when to send it, or anything
+  to do next.
 - Someone with "waiting to hear" below has something the user was going to do, like send a message
   you drafted. When the user next talks to you, in a later conversation, casually ask how it went
   or whether they sent it, once. When you find out, or they'd rather not say, call closeFollowUp.
@@ -104,9 +112,9 @@ func (f *Flows) newAgent(st state, now time.Time) *workflowai.WorkflowAgent {
 				Execute:     workflowai.ExecuteStep(u.logContact),
 			},
 			"draftText": {
-				Description: "Send the user a message to copy and send to someone in their life, as a message of its own.",
+				Description: "Give the user a message to copy and send to someone in their life. Call it last: your turn ends with it.",
 				InputSchema: schemaFor[draft](),
-				Execute:     workflowai.ExecuteStep(u.sendDraft),
+				Execute:     workflowai.ExecuteStep(u.queueDraft),
 			},
 			"closeFollowUp": {
 				Description: "Close someone's follow-up once you know how it went, or the user would rather not say.",
@@ -116,7 +124,7 @@ func (f *Flows) newAgent(st state, now time.Time) *workflowai.WorkflowAgent {
 			"scheduleReminder": {
 				Description: fmt.Sprintf("Remind the user about something at a local date and time, once or repeating. "+
 					"Reminders can be at most a year ahead, repeat at most daily and at least yearly, and a user can have "+
-					"at most %d; if they hit that, offer to cancel old ones.", maxActiveReminders),
+					"at most %d; if they hit that, tell them which ones they could cancel.", maxActiveReminders),
 				InputSchema: schemaFor[reminderInput](),
 				Execute: workflowai.ExecuteFunc(func(ctx context.Context, raw json.RawMessage, _ workflowai.ToolCallOptions) (any, error) {
 					return u.scheduleReminder(ctx, st.User.Location(), raw)
@@ -133,8 +141,20 @@ func (f *Flows) newAgent(st state, now time.Time) *workflowai.WorkflowAgent {
 				Execute:     workflowai.ExecuteStep(u.updateSettings),
 			},
 		},
-		StopWhen:           []workflowai.StopCondition{workflowai.IsStepCount(8)},
+		StopWhen:           []workflowai.StopCondition{workflowai.IsStepCount(8), draftQueued},
 		ToolApprovalSecret: f.ToolApprovalSecret,
+	})
+}
+
+// draftQueued ends the agent's turn once it has queued a draft, so nothing
+// follows the draft and its "For" reply. A rejected draft doesn't count, so
+// the agent can rewrite it.
+func draftQueued(steps []workflowai.StepResult) bool {
+	if len(steps) == 0 {
+		return false
+	}
+	return slices.ContainsFunc(steps[len(steps)-1].ToolResults, func(result workflowai.ToolResult) bool {
+		return result.ToolName == "draftText" && !result.IsError
 	})
 }
 
@@ -425,7 +445,7 @@ func (u userTools) scheduleReminder(ctx context.Context, loc *time.Location, raw
 		return scheduledReminder{}, err
 	}
 	if count >= maxActiveReminders {
-		return scheduledReminder{}, fmt.Errorf("the user already has %d reminders, the most allowed; offer to cancel some first", count)
+		return scheduledReminder{}, fmt.Errorf("the user already has %d reminders, the most allowed; tell them which ones they could cancel", count)
 	}
 	run, err := workflow.Start(ctx, workflows.Reminder{ChatID: u.ChatID, At: at, About: in.About, Person: in.Person, EveryDays: in.EveryDays})
 	if err != nil {

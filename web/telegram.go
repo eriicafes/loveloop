@@ -76,7 +76,8 @@ func (a *App) handleMessage(ctx context.Context, message telegram.Message) error
 		return nil
 	}
 	if len(a.AllowedUsers) > 0 && !slices.Contains(a.AllowedUsers, message.From.ID) {
-		return a.Bot.SendMessage(ctx, telegram.SendMessageParams{ChatID: chatID, Text: "Sorry, LoveLoop is invite only for now 💌"})
+		_, err := a.Bot.SendMessage(ctx, telegram.SendMessageParams{ChatID: chatID, Text: "Sorry, LoveLoop is invite only for now 💌"})
+		return err
 	}
 	if _, _, err := a.Store.EnsureUser(ctx, chatID, message.From.FirstName, time.Now()); err != nil {
 		return err
@@ -88,12 +89,14 @@ func (a *App) handleMessage(ctx context.Context, message telegram.Message) error
 	text := strings.TrimSpace(cmp.Or(message.Text, message.Caption))
 	switch command, _, _ := strings.Cut(text, " "); command {
 	case "":
-		return a.Bot.SendMessage(ctx, telegram.SendMessageParams{ChatID: chatID, Text: "I can only read text for now, but I'm sure it was adorable 🥰"})
+		_, err := a.Bot.SendMessage(ctx, telegram.SendMessageParams{ChatID: chatID, Text: "I can only read text for now, but I'm sure it was adorable 🥰"})
+		return err
 	case "/reset":
 		if err := a.Store.ClearHistory(ctx, chatID); err != nil {
 			return err
 		}
-		return a.Bot.SendMessage(ctx, telegram.SendMessageParams{ChatID: chatID, Text: "Fresh start! I cleared our chat, but I still remember all your people 💞"})
+		_, err := a.Bot.SendMessage(ctx, telegram.SendMessageParams{ChatID: chatID, Text: "Fresh start! I cleared our chat, but I still remember all your people 💞"})
+		return err
 	case "/start":
 		text = "Hi! I just started chatting with you. Introduce yourself briefly and ask what I'd like you to call me."
 	case "/people":

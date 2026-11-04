@@ -24,8 +24,9 @@ steps are recorded and survive restarts.
 
 The agent's tools: `rememberPerson`, `forgetPerson` (asks for confirmation
 with Yes/No buttons through `workflowai` tool approvals), `logContact`,
-`draftText` (sends a message for the user to copy as a message of its own,
-before the agent's remarks, and rejects dashes, semicolons and label colons),
+`draftText` (ends the agent's turn; the draft arrives after the agent's words
+as a message of its own, with a "For {name}" reply quoting it, and is rejected
+for dashes, semicolons or label colons),
 `closeFollowUp`, `scheduleReminder`, `cancelReminder` (cancels the reminder's
 current run), and `updateSettings`.
 

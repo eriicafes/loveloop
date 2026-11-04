@@ -51,7 +51,7 @@ func (f *Flows) Reminder(ctx context.Context, input workflows.Reminder) (workflo
 
 	reason := fmt.Sprintf("Reminder the user asked for: %q.", input.About)
 	if input.Person != "" {
-		reason += fmt.Sprintf(" It's about %s; offer a message for them with draftText if it fits.", input.Person)
+		reason += fmt.Sprintf(" It's about %s; write a message for them with draftText if it fits.", input.Person)
 	}
 	mail := scoped[store.Mail]{ChatID: input.ChatID, Input: store.Mail{Nudge: reason}}
 	if _, err := workflow.Step(ctx, f.deliverMail, mail); err != nil {
