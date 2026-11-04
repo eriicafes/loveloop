@@ -1,6 +1,8 @@
 package flows
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"slices"
 	"testing"
 	"time"
@@ -187,5 +189,34 @@ func TestGroupMail(t *testing.T) {
 	}
 	if groups := groupMail(nil); len(groups) != 0 {
 		t.Fatalf("groups of no mail = %v", groups)
+	}
+}
+
+// TestGatewayAuthReadsCurrentToken checks that each gateway request carries
+// the token set when it is sent, so a rotated OIDC token is picked up.
+func TestGatewayAuthReadsCurrentToken(t *testing.T) {
+	var got []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = append(got, r.Header.Get("Authorization"))
+	}))
+	defer server.Close()
+	client := &http.Client{Transport: gatewayAuth{next: http.DefaultTransport}}
+	t.Setenv("AI_GATEWAY_API_KEY", "")
+	for _, token := range []string{"oidc-1", "oidc-2"} {
+		t.Setenv("VERCEL_OIDC_TOKEN", token)
+		response, err := client.Get(server.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+	}
+	t.Setenv("AI_GATEWAY_API_KEY", "key")
+	response, err := client.Get(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if want := []string{"Bearer oidc-1", "Bearer oidc-2", "Bearer key"}; !slices.Equal(got, want) {
+		t.Fatalf("authorization = %v, want %v", got, want)
 	}
 }
